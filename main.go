@@ -1,7 +1,11 @@
+/*
+Copyright © 2025 NAME HERE <EMAIL ADDRESS>
+
+*/
 package main
 
-import "fmt"
+import "github.com/razobeckett/goco/cmd"
 
 func main() {
-	fmt.Println("Hello")
+	cmd.Execute()
 }
