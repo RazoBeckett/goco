@@ -18,34 +18,9 @@ var (
 	breakingChange bool
 )
 
-// Valid Gemini models (update this list as needed)
-var validModels = []string{
-	"gemini-2.0-flash-exp",
-	"gemini-1.5-flash",
-	"gemini-1.5-pro",
-	"gemini-1.0-pro",
-}
-
-func isValidModel(model string) bool {
-	for _, valid := range validModels {
-		if model == valid {
-			return true
-		}
-	}
-	return false
-}
-
 var generateCmd = &cobra.Command{
 	Use:   "generate",
 	Short: "Generate a commit message using Gemini",
-	PreRunE: func(cmd *cobra.Command, args []string) error {
-		// Validate model name
-		if !isValidModel(model) {
-			return fmt.Errorf("invalid model '%s'. Valid models are: %s",
-				model, strings.Join(validModels, ", "))
-		}
-		return nil
-	},
 
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
@@ -57,6 +32,28 @@ var generateCmd = &cobra.Command{
 			log.Fatalf("failed to create genai client: %v", err)
 		}
 
+		models, err := client.Models.List(ctx, nil)
+
+		if err != nil {
+			log.Fatalf("Failed to list model: %v", err)
+		}
+
+		var unfilteredModelsList []string
+		for _, model := range models.Items {
+			unfilteredModelsList = append(unfilteredModelsList, model.Name)
+			// fmt.Println(model.Name)
+		}
+
+		var filteredModelsList []string
+		for _, m := range unfilteredModelsList {
+			name := strings.TrimPrefix(m, "models/")
+			if strings.HasPrefix(name, "gemini-") {
+				filteredModelsList = append(filteredModelsList, name)
+			}
+		}
+
+		fmt.Println(filteredModelsList)
+
 		gitStatus := exec.Command("git", "status")
 
 		gitStatusOutput, err := gitStatus.Output()
@@ -65,7 +62,7 @@ var generateCmd = &cobra.Command{
 			return
 		}
 
-		gitDiff := exec.Command("git", "diff", "--no-color", "--staged")
+		gitDiff := exec.Command("git", "diff", "--no-color")
 
 		gitDiffOutput, err := gitDiff.Output()
 		if err != nil {
@@ -73,7 +70,9 @@ var generateCmd = &cobra.Command{
 			return
 		}
 
-		prompt := fmt.Sprintf("Generate Conventional Commit:\n\nGit Status: %s\n\nGit Diff: %s", gitStatusOutput, gitDiffOutput)
+		referLink := "https://gist.githubusercontent.com/qoomon/5dfcdf8eec66a051ecd85625518cfd13/raw/d7d529a329079616d47dcf100bd7d2d2c848e835/conventional-commits-cheatsheet.md"
+
+		prompt := fmt.Sprintf("Generate Conventional Commit:\n\nGit Status: %s\n\nGit Diff: %s\n\nThings to do before resposeding, you won't responed anything rather than the commit message and commit description that's all i want, and make sure you read: %v", gitStatusOutput, gitDiffOutput, referLink)
 
 		fmt.Println(prompt)
 
@@ -93,7 +92,7 @@ var generateCmd = &cobra.Command{
 
 func init() {
 	generateCmd.Flags().StringVarP(&apiKey, "api-key", "k", "", "Gemini API key")
-	generateCmd.Flags().StringVarP(&model, "model", "m", "gemini-2.0-flash-exp", "Gemini model to use")
+	generateCmd.Flags().StringVarP(&model, "model", "m", "gemini-2.5-flash", "Gemini model to use")
 	generateCmd.Flags().StringVarP(&commitType, "type", "t", "", "Commit type (feat, fix, chore, etc.)")
 	generateCmd.Flags().BoolVarP(&breakingChange, "breaking-change", "b", false, "Mark commit as breaking change")
 
