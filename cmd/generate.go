@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
+	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -16,6 +18,7 @@ var (
 	model          string
 	commitType     string
 	breakingChange bool
+	stagged        bool
 )
 
 var generateCmd = &cobra.Command{
@@ -38,21 +41,22 @@ var generateCmd = &cobra.Command{
 			log.Fatalf("Failed to list model: %v", err)
 		}
 
-		var unfilteredModelsList []string
-		for _, model := range models.Items {
-			unfilteredModelsList = append(unfilteredModelsList, model.Name)
-			// fmt.Println(model.Name)
-		}
-
-		var filteredModelsList []string
-		for _, m := range unfilteredModelsList {
-			name := strings.TrimPrefix(m, "models/")
-			if strings.HasPrefix(name, "gemini-") {
-				filteredModelsList = append(filteredModelsList, name)
+		var filtered []string
+		re := regexp.MustCompile(`^gemini-\d+\.\d+`)
+		for _, m := range models.Items {
+			name := strings.TrimPrefix(m.Name, "models/")
+			if re.MatchString(name) {
+				filtered = append(filtered, name)
 			}
 		}
 
-		fmt.Println(filteredModelsList)
+		if !slices.Contains(filtered, model) {
+			var b strings.Builder
+			for _, m := range filtered {
+				fmt.Fprintf(&b, "%s\n", m)
+			}
+			log.Fatalf("Model not available\nAvailable Models: \n%s", b.String())
+		}
 
 		gitStatus := exec.Command("git", "status")
 
@@ -62,7 +66,14 @@ var generateCmd = &cobra.Command{
 			return
 		}
 
-		gitDiff := exec.Command("git", "diff", "--no-color")
+		var gitDiff *exec.Cmd
+
+		if stagged {
+			gitDiff = exec.Command("git", "diff", "--no-color", "--staged")
+
+		} else {
+			gitDiff = exec.Command("git", "diff", "--no-color")
+		}
 
 		gitDiffOutput, err := gitDiff.Output()
 		if err != nil {
@@ -95,6 +106,7 @@ func init() {
 	generateCmd.Flags().StringVarP(&model, "model", "m", "gemini-2.5-flash", "Gemini model to use")
 	generateCmd.Flags().StringVarP(&commitType, "type", "t", "", "Commit type (feat, fix, chore, etc.)")
 	generateCmd.Flags().BoolVarP(&breakingChange, "breaking-change", "b", false, "Mark commit as breaking change")
+	generateCmd.Flags().BoolVarP(&stagged, "stagged", "s", false, "stagged changes")
 
 	generateCmd.MarkFlagRequired("api-key")
 	rootCmd.AddCommand(generateCmd)
