@@ -3,6 +3,7 @@ module github.com/razobeckett/goco
 go 1.24.6
 
 require (
+	github.com/BurntSushi/toml v1.5.0
 	github.com/spf13/cobra v1.9.1
 	google.golang.org/genai v1.19.0
 )

@@ -27,6 +27,15 @@ var generateCmd = &cobra.Command{
 	Short: "Generate a commit message using Gemini",
 
 	Run: func(cmd *cobra.Command, args []string) {
+		// Use flag value if provided, otherwise get from config
+		if apiKey == "" {
+			apiKey = GetConfig().GetGeminiApiKey()
+		}
+
+		if apiKey == "" {
+			log.Fatalf("Gemini API key not found. Set %s environment variable or use --api-key flag", GetConfig().General.ApiKeyGeminiEnvVariable)
+		}
+
 		ctx := context.Background()
 		client, err := genai.NewClient(ctx, &genai.ClientConfig{
 			APIKey:  apiKey,
@@ -126,6 +135,5 @@ func init() {
 	generateCmd.Flags().BoolVarP(&breakingChange, "breaking-change", "b", false, "Mark commit as breaking change")
 	generateCmd.Flags().BoolVarP(&stagged, "stagged", "s", false, "stagged changes")
 
-	generateCmd.MarkFlagRequired("api-key")
 	rootCmd.AddCommand(generateCmd)
 }
