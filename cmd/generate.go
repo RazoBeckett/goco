@@ -35,6 +35,18 @@ var (
 			Foreground(lipgloss.Color("#6B7280")).
 			Italic(true).
 			MarginTop(1)
+
+	verboseHeaderStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#10B981")).
+				Bold(true).
+				MarginBottom(1)
+
+	verboseContentStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#374151")).
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("#D1D5DB")).
+				Padding(1).
+				MarginBottom(1)
 )
 
 func promptForApiKey(envVar string) (string, error) {
@@ -168,11 +180,8 @@ var generateCmd = &cobra.Command{
 		prompt := fmt.Sprintf("Generate Conventional Commit:\n\nGit Status: %s\n\nGit Diff: %s\n\nThings to do before resposeding, you won't responed anything rather than the commit message and commit description that's all i want, and make sure you read: %v", gitStatusOutput, gitDiffOutput, referLink)
 
 		if verbose {
-			fmt.Println("📝 Prompt being sent to Gemini:")
-			fmt.Println(prompt)
-			fmt.Println()
-		} else {
-			fmt.Println("🤖 Generating commit message...")
+			fmt.Println(verboseHeaderStyle.Render("📝 Prompt being sent to Gemini:"))
+			fmt.Println(verboseContentStyle.Render(prompt))
 		}
 
 		resp, err := client.Models.GenerateContent(
