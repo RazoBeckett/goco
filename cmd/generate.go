@@ -10,6 +10,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
@@ -75,6 +77,52 @@ var (
 				MarginBottom(1).
 				Width(80)
 )
+
+type spinnerModel struct {
+	spinner spinner.Model
+	message string
+	done    bool
+}
+
+func (m spinnerModel) Init() tea.Cmd {
+	return m.spinner.Tick
+}
+
+func (m spinnerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+	case spinner.TickMsg:
+		var cmd tea.Cmd
+		m.spinner, cmd = m.spinner.Update(msg)
+		return m, cmd
+	case string:
+		if msg == "done" {
+			m.done = true
+			return m, tea.Quit
+		}
+	}
+	return m, nil
+}
+
+func (m spinnerModel) View() string {
+	if m.done {
+		return ""
+	}
+	return fmt.Sprintf("%s %s", m.spinner.View(), m.message)
+}
+
+func newSpinnerModel(message string) spinnerModel {
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#10B981"))
+	return spinnerModel{
+		spinner: s,
+		message: message,
+	}
+}
 
 func promptForApiKey(envVar string) (string, error) {
 	var apiKey string
@@ -218,12 +266,29 @@ var generateCmd = &cobra.Command{
 			fmt.Println(diffBox)
 		}
 
+		// Start spinner during API call
+		spinnerProgram := tea.NewProgram(newSpinnerModel("Generating commit message..."))
+
+		// Run spinner in goroutine
+		done := make(chan bool)
+		go func() {
+			spinnerProgram.Run()
+			done <- true
+		}()
+
+		// Make API call
 		resp, err := client.Models.GenerateContent(
 			ctx,
 			model,
 			genai.Text(prompt),
 			nil,
 		)
+
+		// Stop spinner
+		spinnerProgram.Send("done")
+		spinnerProgram.Quit()
+		<-done // Wait for spinner to finish
+
 		if err != nil {
 			log.Fatalf("Gemini API error: %v", err)
 		}
