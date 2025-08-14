@@ -309,8 +309,6 @@ var generateCmd = &cobra.Command{
 			log.Fatalf("Failed to commit changes %v", err)
 		}
 
-		fmt.Println(final.Output())
-
 	},
 }
 
