@@ -73,8 +73,7 @@ var (
 				BorderForeground(lipgloss.Color("#10B981")).
 				Padding(1).
 				MarginBottom(1).
-				Width(80).
-				Foreground(lipgloss.Color("#065F46"))
+				Width(80)
 )
 
 func promptForApiKey(envVar string) (string, error) {
