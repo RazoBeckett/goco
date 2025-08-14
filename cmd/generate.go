@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbletea"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
@@ -304,8 +304,6 @@ var generateCmd = &cobra.Command{
 		}
 
 		final := exec.Command("git", "commit", "-m", commitMessage)
-		final.Stdout = os.Stdout
-		final.Stderr = os.Stderr
 
 		if err := final.Run(); err != nil {
 			log.Fatalf("Failed to commit changes %v", err)
