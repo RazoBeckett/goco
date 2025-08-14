@@ -304,6 +304,8 @@ var generateCmd = &cobra.Command{
 		}
 
 		final := exec.Command("git", "commit", "-m", commitMessage)
+		final.Stdout = os.Stdout
+		final.Stderr = os.Stderr
 
 		if err := final.Run(); err != nil {
 			log.Fatalf("Failed to commit changes %v", err)
