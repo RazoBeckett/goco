@@ -61,6 +61,20 @@ var (
 			Padding(1).
 			MarginBottom(1).
 			Width(80)
+
+	commitMessageHeaderStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("#FFFFFF")).
+					Bold(true).
+					Background(lipgloss.Color("#059669")).
+					Padding(0, 1)
+
+	commitMessageBoxStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("#10B981")).
+				Padding(1).
+				MarginBottom(1).
+				Width(80).
+				Foreground(lipgloss.Color("#065F46"))
 )
 
 func promptForApiKey(envVar string) (string, error) {
@@ -217,7 +231,9 @@ var generateCmd = &cobra.Command{
 
 		commitMessage := resp.Text()
 
-		fmt.Println(resp.Text())
+		// Show the commit message in a beautiful green box
+		fmt.Println(commitMessageHeaderStyle.Render("✅ Generated Commit Message"))
+		fmt.Println(commitMessageBoxStyle.Render(commitMessage))
 
 		if err := exec.Command("git", "add", "-u").Run(); err != nil {
 			log.Fatalf("Failed to stage changes %v", err)
