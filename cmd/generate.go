@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"regexp"
 	"slices"
@@ -97,7 +98,24 @@ var generateCmd = &cobra.Command{
 			log.Fatalf("Gemini API error: %v", err)
 		}
 
+		commitMessage := resp.Text()
+
 		fmt.Println(resp.Text())
+
+		if err := exec.Command("git", "add", "-u").Run(); err != nil {
+			log.Fatalf("Failed to stage changes %v", err)
+		}
+
+		final := exec.Command("git", "commit", "-m", commitMessage)
+		final.Stdout = os.Stdout
+		final.Stderr = os.Stderr
+
+		if err := final.Run(); err != nil {
+			log.Fatalf("Failed to commit changes %v", err)
+		}
+
+		fmt.Println(final.Output())
+
 	},
 }
 
