@@ -10,6 +10,10 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/spinner"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 	"google.golang.org/genai"
 )
@@ -20,7 +24,152 @@ var (
 	commitType     string
 	breakingChange bool
 	stagged        bool
+	verbose        bool
 )
+
+var (
+	titleStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#7C3AED")).
+			Bold(true).
+			MarginBottom(1)
+
+	noteStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#6B7280")).
+			Italic(true).
+			MarginTop(1)
+
+	statusHeaderStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#10B981")).
+				Bold(true).
+				Background(lipgloss.Color("#065F46")).
+				Padding(0, 1)
+
+	diffHeaderStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#3B82F6")).
+			Bold(true).
+			Background(lipgloss.Color("#1E3A8A")).
+			Padding(0, 1)
+
+	statusBoxStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#10B981")).
+			Padding(1).
+			MarginBottom(1).
+			Width(80)
+
+	diffBoxStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#3B82F6")).
+			Padding(1).
+			MarginBottom(1).
+			Width(80)
+
+	commitMessageHeaderStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("#FFFFFF")).
+					Bold(true).
+					Background(lipgloss.Color("#059669")).
+					Padding(0, 1)
+
+	commitMessageBoxStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("#10B981")).
+				Padding(1).
+				MarginBottom(1).
+				Width(80)
+)
+
+type spinnerModel struct {
+	spinner spinner.Model
+	message string
+	done    bool
+}
+
+func (m spinnerModel) Init() tea.Cmd {
+	return m.spinner.Tick
+}
+
+func (m spinnerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+	case spinner.TickMsg:
+		var cmd tea.Cmd
+		m.spinner, cmd = m.spinner.Update(msg)
+		return m, cmd
+	case string:
+		if msg == "done" {
+			m.done = true
+			return m, tea.Quit
+		}
+	}
+	return m, nil
+}
+
+func (m spinnerModel) View() string {
+	if m.done {
+		return ""
+	}
+	return fmt.Sprintf("%s %s", m.spinner.View(), m.message)
+}
+
+func newSpinnerModel(message string) spinnerModel {
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#10B981"))
+	return spinnerModel{
+		spinner: s,
+		message: message,
+	}
+}
+
+func promptForApiKey(envVar string) (string, error) {
+	var apiKey string
+
+	fmt.Println(titleStyle.Render("🔑 Gemini API Key Required"))
+
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Please enter your Gemini API key:").
+				Description("Your key will be set for this session only").
+				Value(&apiKey).
+				EchoMode(huh.EchoModePassword).
+				Validate(func(s string) error {
+					if strings.TrimSpace(s) == "" {
+						return fmt.Errorf("API key cannot be empty")
+					}
+					return nil
+				}),
+		),
+	)
+
+	err := form.Run()
+	if err != nil {
+		return "", err
+	}
+
+	// Set for current session
+	os.Setenv(envVar, apiKey)
+
+	// Show helpful note
+	note := fmt.Sprintf(`
+%s
+
+To avoid this prompt in the future, add this to your shell profile:
+  export %s="your-api-key-here"
+  
+For bash: ~/.bashrc or ~/.bash_profile
+For zsh: ~/.zshrc
+For fish: ~/.config/fish/config.fish`,
+		noteStyle.Render("✅ API key set for this session!"), envVar)
+
+	fmt.Println(note)
+	fmt.Println()
+
+	return apiKey, nil
+}
 
 var generateCmd = &cobra.Command{
 	Use:   "generate",
@@ -32,8 +181,18 @@ var generateCmd = &cobra.Command{
 			apiKey = GetConfig().GetGeminiApiKey()
 		}
 
+		// If still no API key, prompt user interactively
 		if apiKey == "" {
-			log.Fatalf("Gemini API key not found. Set %s environment variable or use --api-key flag", GetConfig().General.ApiKeyGeminiEnvVariable)
+			envVar := GetConfig().General.ApiKeyGeminiEnvVariable
+			if envVar == "" {
+				envVar = "GOCO_GEMINI_KEY"
+			}
+
+			promptedKey, err := promptForApiKey(envVar)
+			if err != nil {
+				log.Fatalf("Failed to get API key: %v", err)
+			}
+			apiKey = promptedKey
 		}
 
 		ctx := context.Background()
@@ -95,21 +254,50 @@ var generateCmd = &cobra.Command{
 
 		prompt := fmt.Sprintf("Generate Conventional Commit:\n\nGit Status: %s\n\nGit Diff: %s\n\nThings to do before resposeding, you won't responed anything rather than the commit message and commit description that's all i want, and make sure you read: %v", gitStatusOutput, gitDiffOutput, referLink)
 
-		fmt.Println(prompt)
+		if verbose {
+			// Show git status in a green box
+			statusBox := statusBoxStyle.Render(string(gitStatusOutput))
+			fmt.Println(statusHeaderStyle.Render("📊 Git Status"))
+			fmt.Println(statusBox)
 
+			// Show git diff in a blue box
+			diffBox := diffBoxStyle.Render(string(gitDiffOutput))
+			fmt.Println(diffHeaderStyle.Render("📝 Git Diff"))
+			fmt.Println(diffBox)
+		}
+
+		// Start spinner during API call
+		spinnerProgram := tea.NewProgram(newSpinnerModel("Generating commit message..."))
+
+		// Run spinner in goroutine
+		done := make(chan bool)
+		go func() {
+			spinnerProgram.Run()
+			done <- true
+		}()
+
+		// Make API call
 		resp, err := client.Models.GenerateContent(
 			ctx,
 			model,
 			genai.Text(prompt),
 			nil,
 		)
+
+		// Stop spinner
+		spinnerProgram.Send("done")
+		spinnerProgram.Quit()
+		<-done // Wait for spinner to finish
+
 		if err != nil {
 			log.Fatalf("Gemini API error: %v", err)
 		}
 
 		commitMessage := resp.Text()
 
-		fmt.Println(resp.Text())
+		// Show the commit message in a beautiful green box
+		fmt.Println(commitMessageHeaderStyle.Render("✅ Generated Commit Message"))
+		fmt.Println(commitMessageBoxStyle.Render(commitMessage))
 
 		if err := exec.Command("git", "add", "-u").Run(); err != nil {
 			log.Fatalf("Failed to stage changes %v", err)
@@ -123,8 +311,6 @@ var generateCmd = &cobra.Command{
 			log.Fatalf("Failed to commit changes %v", err)
 		}
 
-		fmt.Println(final.Output())
-
 	},
 }
 
@@ -134,6 +320,7 @@ func init() {
 	generateCmd.Flags().StringVarP(&commitType, "type", "t", "", "Commit type (feat, fix, chore, etc.)")
 	generateCmd.Flags().BoolVarP(&breakingChange, "breaking-change", "b", false, "Mark commit as breaking change")
 	generateCmd.Flags().BoolVarP(&stagged, "stagged", "s", false, "stagged changes")
+	generateCmd.Flags().BoolVar(&verbose, "verbose", false, "Show detailed output including prompts")
 
 	rootCmd.AddCommand(generateCmd)
 }
