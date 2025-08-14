@@ -22,6 +22,7 @@ var (
 	commitType     string
 	breakingChange bool
 	stagged        bool
+	verbose        bool
 )
 
 var (
@@ -166,7 +167,13 @@ var generateCmd = &cobra.Command{
 
 		prompt := fmt.Sprintf("Generate Conventional Commit:\n\nGit Status: %s\n\nGit Diff: %s\n\nThings to do before resposeding, you won't responed anything rather than the commit message and commit description that's all i want, and make sure you read: %v", gitStatusOutput, gitDiffOutput, referLink)
 
-		fmt.Println(prompt)
+		if verbose {
+			fmt.Println("📝 Prompt being sent to Gemini:")
+			fmt.Println(prompt)
+			fmt.Println()
+		} else {
+			fmt.Println("🤖 Generating commit message...")
+		}
 
 		resp, err := client.Models.GenerateContent(
 			ctx,
@@ -205,6 +212,7 @@ func init() {
 	generateCmd.Flags().StringVarP(&commitType, "type", "t", "", "Commit type (feat, fix, chore, etc.)")
 	generateCmd.Flags().BoolVarP(&breakingChange, "breaking-change", "b", false, "Mark commit as breaking change")
 	generateCmd.Flags().BoolVarP(&stagged, "stagged", "s", false, "stagged changes")
+	generateCmd.Flags().BoolVar(&verbose, "verbose", false, "Show detailed output including prompts")
 
 	rootCmd.AddCommand(generateCmd)
 }
