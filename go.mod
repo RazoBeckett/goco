@@ -3,6 +3,7 @@ module github.com/razobeckett/goco
 go 1.24.6
 
 require (
+	github.com/BurntSushi/toml v1.5.0
 	github.com/spf13/cobra v1.9.1
 	google.golang.org/genai v1.19.0
 )
@@ -11,7 +12,6 @@ require (
 	cloud.google.com/go v0.121.4 // indirect
 	cloud.google.com/go/auth v0.16.4 // indirect
 	cloud.google.com/go/compute/metadata v0.8.0 // indirect
-	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
