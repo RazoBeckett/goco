@@ -36,17 +36,31 @@ var (
 			Italic(true).
 			MarginTop(1)
 
-	verboseHeaderStyle = lipgloss.NewStyle().
+	statusHeaderStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#10B981")).
 				Bold(true).
-				MarginBottom(1)
+				Background(lipgloss.Color("#065F46")).
+				Padding(0, 1)
 
-	verboseContentStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#374151")).
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(lipgloss.Color("#D1D5DB")).
-				Padding(1).
-				MarginBottom(1)
+	diffHeaderStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#3B82F6")).
+			Bold(true).
+			Background(lipgloss.Color("#1E3A8A")).
+			Padding(0, 1)
+
+	statusBoxStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#10B981")).
+			Padding(1).
+			MarginBottom(1).
+			Width(80)
+
+	diffBoxStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#3B82F6")).
+			Padding(1).
+			MarginBottom(1).
+			Width(80)
 )
 
 func promptForApiKey(envVar string) (string, error) {
@@ -180,8 +194,15 @@ var generateCmd = &cobra.Command{
 		prompt := fmt.Sprintf("Generate Conventional Commit:\n\nGit Status: %s\n\nGit Diff: %s\n\nThings to do before resposeding, you won't responed anything rather than the commit message and commit description that's all i want, and make sure you read: %v", gitStatusOutput, gitDiffOutput, referLink)
 
 		if verbose {
-			fmt.Println(verboseHeaderStyle.Render("📝 Prompt being sent to Gemini:"))
-			fmt.Println(verboseContentStyle.Render(prompt))
+			// Show git status in a green box
+			statusBox := statusBoxStyle.Render(string(gitStatusOutput))
+			fmt.Println(statusHeaderStyle.Render("📊 Git Status"))
+			fmt.Println(statusBox)
+
+			// Show git diff in a blue box
+			diffBox := diffBoxStyle.Render(string(gitDiffOutput))
+			fmt.Println(diffHeaderStyle.Render("📝 Git Diff"))
+			fmt.Println(diffBox)
 		}
 
 		resp, err := client.Models.GenerateContent(
