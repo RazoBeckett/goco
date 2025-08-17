@@ -4,6 +4,8 @@
 
 GoCo transforms your git workflow by automatically generating meaningful conventional commit messages using Google's Gemini AI, all wrapped in a gorgeous TUI built with Charm Bracelet libraries.
 
+![GOCO_PREVIEW](demo.gif)
+
 ## ✨ Features
 
 - 🤖 **AI-Powered**: Uses Google Gemini to analyze your changes and generate perfect conventional commit messages
