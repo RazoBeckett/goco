@@ -155,14 +155,14 @@ func promptForApiKey(envVar string) (string, error) {
 
 	// Show helpful note
 	note := fmt.Sprintf(`
-%s
+		%s
 
-To avoid this prompt in the future, add this to your shell profile:
-  export %s="your-api-key-here"
-  
-For bash: ~/.bashrc or ~/.bash_profile
-For zsh: ~/.zshrc
-For fish: ~/.config/fish/config.fish`,
+		To avoid this prompt in the future, add this to your shell profile:
+		export %s="your-api-key-here"
+
+		For bash: ~/.bashrc or ~/.bash_profile
+		For zsh: ~/.zshrc
+		For fish: ~/.config/fish/config.fish`,
 		noteStyle.Render("✅ API key set for this session!"), envVar)
 
 	fmt.Println(note)
