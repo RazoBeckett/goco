@@ -9,6 +9,8 @@ import (
 
 type General struct {
 	ApiKeyGeminiEnvVariable string `toml:"api_key_gemini_env_variable"`
+	ApiKeyGroqEnvVariable   string `toml:"api_key_groq_env_variable"`
+	DefaultProvider         string `toml:"default_provider"` // "gemini" or "groq"
 }
 
 type Config struct {
@@ -31,6 +33,8 @@ func LoadConfig() (*Config, error) {
 	config := &Config{
 		General: General{
 			ApiKeyGeminiEnvVariable: "GOCO_GEMINI_KEY",
+			ApiKeyGroqEnvVariable:   "GOCO_GROQ_KEY",
+			DefaultProvider:         "gemini",
 		},
 	}
 
@@ -53,6 +57,21 @@ func (c *Config) GetGeminiApiKey() string {
 		envVar = "GOCO_GEMINI_KEY"
 	}
 	return os.Getenv(envVar)
+}
+
+func (c *Config) GetGroqApiKey() string {
+	envVar := c.General.ApiKeyGroqEnvVariable
+	if envVar == "" {
+		envVar = "GOCO_GROQ_KEY"
+	}
+	return os.Getenv(envVar)
+}
+
+func (c *Config) GetDefaultProvider() string {
+	if c.General.DefaultProvider == "" {
+		return "gemini"
+	}
+	return c.General.DefaultProvider
 }
 
 func (c *Config) CreateConfigFile() error {
