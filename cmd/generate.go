@@ -19,12 +19,13 @@ import (
 )
 
 var (
-	apiKey         string
-	model          string
-	commitType     string
-	breakingChange bool
-	stagged        bool
-	verbose        bool
+	apiKey             string
+	model              string
+	commitType         string
+	breakingChange     bool
+	stagged            bool
+	verbose            bool
+	customInstructions string
 )
 
 var (
@@ -270,6 +271,11 @@ var generateCmd = &cobra.Command{
 			referLink,
 		)
 
+		// Append custom instructions if provided
+		if customInstructions != "" {
+			prompt += fmt.Sprintf("\n\nAdditional Instructions:\n%s\n", customInstructions)
+		}
+
 		if verbose {
 			// Show git status in a green box
 			statusBox := statusBoxStyle.Render(string(gitStatusOutput))
@@ -337,6 +343,7 @@ func init() {
 	generateCmd.Flags().BoolVarP(&breakingChange, "breaking-change", "b", false, "Mark commit as breaking change")
 	generateCmd.Flags().BoolVarP(&stagged, "stagged", "s", false, "stagged changes")
 	generateCmd.Flags().BoolVar(&verbose, "verbose", false, "Show detailed output including prompts")
+	generateCmd.Flags().StringVarP(&customInstructions, "custom-instructions", "c", "", "Custom instructions to add to the prompt")
 
 	rootCmd.AddCommand(generateCmd)
 }
