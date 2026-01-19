@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -25,6 +24,7 @@ var (
 	stagged            bool
 	verbose            bool
 	customInstructions string
+	edit               bool
 )
 
 var (
@@ -171,11 +171,87 @@ func promptForApiKey(envVar, providerName string) (string, error) {
 	return apiKey, nil
 }
 
-var generateCmd = &cobra.Command{
-	Use:   "generate",
-	Short: "Generate a commit message using AI",
+func editCommitMessage(message string) (string, error) {
+	tmpFile, err := os.CreateTemp("", "goco-commit-*.txt")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
 
-	Run: func(cmd *cobra.Command, args []string) {
+	if _, err := tmpFile.WriteString(message); err != nil {
+		tmpFile.Close()
+		return "", fmt.Errorf("failed to write to temp file: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return "", fmt.Errorf("failed to close temp file: %w", err)
+	}
+
+	editor := os.Getenv("EDITOR")
+	if editor == "" {
+		editor = os.Getenv("VISUAL")
+	}
+	if editor == "" {
+		editors := []string{"vim", "nano", "vi"}
+		for _, e := range editors {
+			if _, err := exec.LookPath(e); err == nil {
+				editor = e
+				break
+			}
+		}
+	}
+	if editor == "" {
+		return "", fmt.Errorf("failed to find editor: %w", ErrNoEditor)
+	}
+
+	editCmd := exec.Command(editor, tmpPath)
+	editCmd.Stdin = os.Stdin
+	editCmd.Stdout = os.Stdout
+	editCmd.Stderr = os.Stderr
+
+	if err := editCmd.Run(); err != nil {
+		return "", fmt.Errorf("editor %q failed: %w", editor, err)
+	}
+
+	editedContent, err := os.ReadFile(tmpPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read edited message: %w", err)
+	}
+
+	editedMessage := strings.TrimSpace(string(editedContent))
+	if editedMessage == "" {
+		return message, nil
+	}
+
+	return editedMessage, nil
+}
+
+var generateCmd = &cobra.Command{
+	Use:     "generate",
+	Short:   "Generate a commit message using AI",
+	Example: "  goco generate --provider gemini --verbose\n  goco generate -e --custom-instructions \"focus on api changes\"",
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		validProviders := map[string]bool{"gemini": true, "groq": true}
+
+		if provider != "" && !validProviders[provider] {
+			return &ValidationError{
+				Field:   "provider",
+				Message: fmt.Sprintf("invalid provider %q", provider),
+				Help:    "supported providers: gemini, groq. Use --provider flag or configure default in config.",
+			}
+		}
+
+		if model != "" && provider == "" {
+			return &ValidationError{
+				Field:   "model",
+				Message: "model requires provider",
+				Help:    "specify --provider when using --model flag",
+			}
+		}
+
+		return nil
+	},
+	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
 		// Use flag value for provider if provided, otherwise get from config
@@ -202,7 +278,7 @@ var generateCmd = &cobra.Command{
 
 				promptedKey, err := promptForApiKey(envVar, "Groq")
 				if err != nil {
-					log.Fatalf("Failed to get API key: %v", err)
+					return fmt.Errorf("failed to get Groq API key: %w", err)
 				}
 				apiKey = promptedKey
 			}
@@ -214,7 +290,11 @@ var generateCmd = &cobra.Command{
 
 			aiProvider, err = providers.NewGroqProvider(ctx, apiKey, model)
 			if err != nil {
-				log.Fatalf("Failed to create Groq provider: %v", err)
+				return &ProviderError{
+					Provider: "groq",
+					Message:  "failed to initialize provider",
+					Err:      err,
+				}
 			}
 
 		case "gemini":
@@ -231,7 +311,7 @@ var generateCmd = &cobra.Command{
 
 				promptedKey, err := promptForApiKey(envVar, "Gemini")
 				if err != nil {
-					log.Fatalf("Failed to get API key: %v", err)
+					return fmt.Errorf("failed to get Gemini API key: %w", err)
 				}
 				apiKey = promptedKey
 			}
@@ -243,23 +323,45 @@ var generateCmd = &cobra.Command{
 
 			aiProvider, err = providers.NewGeminiProvider(ctx, apiKey, model)
 			if err != nil {
-				log.Fatalf("Failed to create Gemini provider: %v", err)
+				return &ProviderError{
+					Provider: "gemini",
+					Message:  "failed to initialize provider",
+					Err:      err,
+				}
 			}
 
 		default:
-			log.Fatalf("Unsupported provider: %s (supported: gemini, groq)", provider)
+			return &ValidationError{
+				Field:   "provider",
+				Message: fmt.Sprintf("unsupported provider %q", provider),
+				Help:    "supported providers: gemini, groq",
+			}
 		}
 
-		// Validate the model
 		if err := aiProvider.ValidateModel(ctx, model); err != nil {
-			log.Fatalf("Model validation failed: %v", err)
+			return &ValidationError{
+				Field:   "model",
+				Message: fmt.Sprintf("validation failed for model %q", model),
+				Help:    "run 'goco models --provider <provider>' to list available models",
+			}
 		}
 
-		// Get git status
 		gitStatus := exec.Command("git", "status")
 		gitStatusOutput, err := gitStatus.Output()
 		if err != nil {
-			log.Fatalf("Error getting git status: %v", err)
+			return &GitError{
+				Command: "git status",
+				Message: "failed to get repository status",
+				Err:     err,
+			}
+		}
+
+		if len(strings.TrimSpace(string(gitStatusOutput))) == 0 {
+			return &GitError{
+				Command: "git status",
+				Message: "no changes detected",
+				Err:     ErrGitRepository,
+			}
 		}
 
 		// Get git diff
@@ -272,7 +374,11 @@ var generateCmd = &cobra.Command{
 
 		gitDiffOutput, err := gitDiff.Output()
 		if err != nil {
-			log.Fatalf("Error getting git diff: %v", err)
+			return &GitError{
+				Command: "git diff",
+				Message: "failed to get diff",
+				Err:     err,
+			}
 		}
 
 		if verbose {
@@ -311,15 +417,32 @@ var generateCmd = &cobra.Command{
 		<-done // Wait for spinner to finish
 
 		if err != nil {
-			log.Fatalf("AI API error: %v", err)
+			return &APIError{
+				Message: "failed to generate commit message",
+				Err:     err,
+			}
 		}
 
-		// Show the commit message in a beautiful green box
 		fmt.Println(commitMessageHeaderStyle.Render("✅ Generated Commit Message"))
 		fmt.Println(commitMessageBoxStyle.Render(commitMessage))
 
+		if edit {
+			fmt.Println(titleStyle.Render("✏️  Editing Commit Message"))
+			editedMessage, err := editCommitMessage(commitMessage)
+			if err != nil {
+				return fmt.Errorf("failed to edit commit message: %w", err)
+			}
+			commitMessage = editedMessage
+			fmt.Println(commitMessageHeaderStyle.Render("✅ Final Commit Message"))
+			fmt.Println(commitMessageBoxStyle.Render(commitMessage))
+		}
+
 		if err := exec.Command("git", "add", "-u").Run(); err != nil {
-			log.Fatalf("Failed to stage changes %v", err)
+			return &GitError{
+				Command: "git add -u",
+				Message: "failed to stage changes",
+				Err:     err,
+			}
 		}
 
 		final := exec.Command("git", "commit", "-m", commitMessage)
@@ -327,8 +450,14 @@ var generateCmd = &cobra.Command{
 		final.Stderr = os.Stderr
 
 		if err := final.Run(); err != nil {
-			log.Fatalf("Failed to commit changes %v", err)
+			return &GitError{
+				Command: "git commit",
+				Message: "failed to commit changes",
+				Err:     err,
+			}
 		}
+
+		return nil
 	},
 }
 
@@ -341,6 +470,7 @@ func init() {
 	generateCmd.Flags().BoolVarP(&stagged, "stagged", "s", false, "stagged changes")
 	generateCmd.Flags().BoolVar(&verbose, "verbose", false, "Show detailed output including prompts")
 	generateCmd.Flags().StringVarP(&customInstructions, "custom-instructions", "c", "", "Custom instructions to add to the prompt")
+	generateCmd.Flags().BoolVarP(&edit, "edit", "e", false, "Edit the commit message before committing")
 
 	rootCmd.AddCommand(generateCmd)
 }
