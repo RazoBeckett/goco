@@ -2,18 +2,20 @@
 
 **Go Conventional** - AI-powered conventional commit message generator with a beautiful Terminal User Interface.
 
-GoCo transforms your git workflow by automatically generating meaningful conventional commit messages using Google's Gemini AI, all wrapped in a gorgeous TUI built with Charm Bracelet libraries.
+GoCo transforms your git workflow by automatically generating meaningful conventional commit messages using AI providers (Google Gemini or Groq), all wrapped in a gorgeous TUI built with Charm Bracelet libraries.
 
 ![GOCO_PREVIEW](demo.gif)
 
 ## ✨ Features
 
-- 🤖 **AI-Powered**: Uses Google Gemini to analyze your changes and generate perfect conventional commit messages
+- 🤖 **Multi-Provider AI**: Choose between Google Gemini or Groq (Llama models) for commit message generation
 - 🎨 **Beautiful TUI**: Modern terminal interface with styled output, loading spinners, and interactive prompts
 - 🔒 **Secure Input**: Password-masked API key prompts when credentials are missing
-- ⚙️ **Smart Config**: TOML-based configuration with XDG Base Directory support
+- ⚙️ **Smart Config**: TOML-based configuration with XDG Base Directory support and multi-provider support
 - 👁️ **Verbose Mode**: Optional detailed view of git status and diff in styled boxes
 - 🎯 **Zero Setup**: Works out of the box with minimal configuration
+- 🔧 **Custom Instructions**: Add custom instructions to tailor commit messages to your needs
+- 📋 **Model Selection**: List and select from available AI models for each provider
 
 ## 📦 Installation
 
@@ -34,9 +36,16 @@ go install github.com/RazoBeckett/goco@latest
 
 ## 🚀 Quick Start
 
-1. **Set up your Gemini API key** (get one from [Google AI Studio](https://aistudio.google.com/apikey)):
+1. **Choose your AI provider and set up your API key**:
+
+   **Google Gemini** (get one from [Google AI Studio](https://aistudio.google.com/apikey)):
    ```bash
    export GOCO_GEMINI_KEY="your-api-key-here"
+   ```
+
+   **Groq** (get one from [Groq Console](https://console.groq.com)):
+   ```bash
+   export GOCO_GROQ_KEY="your-api-key-here"
    ```
 
 2. **Navigate to your git repository** and stage your changes:
@@ -47,10 +56,29 @@ go install github.com/RazoBeckett/goco@latest
 
 3. **Generate a commit message**:
    ```bash
+   # Use default provider (Gemini)
    goco generate
+
+   # Use Groq provider
+   goco generate --provider groq
+
+   # With custom instructions
+   goco generate --custom-instructions "focus on the backend changes"
+
+   # With specific model
+   goco generate --provider gemini --model gemini-2.5-flash
    ```
 
-That's it! GoCo will analyze your staged changes and generate a beautiful conventional commit message.
+4. **List available models**:
+   ```bash
+   # List models for default provider
+   goco models
+
+   # List models for specific provider
+   goco models --provider groq
+   ```
+
+That's it! GoCo will analyze your staged changes and generate a beautiful conventional commit message, then automatically commit it.
 
 ## 💡 Usage
 
@@ -65,6 +93,29 @@ goco generate --verbose
 
 # Use short flag for verbose mode
 goco generate -v
+
+# Use Groq provider instead of Gemini
+goco generate --provider groq
+
+# Use specific model
+goco generate --provider groq --model llama-3.3-70b-versatile
+
+# Add custom instructions for the AI
+goco generate --custom-instructions "make the message concise"
+
+# Use staged diff instead of working directory
+goco generate --staged
+```
+
+### Listing Available Models
+
+```bash
+# List models for default provider
+goco models
+
+# List models for a specific provider
+goco models --provider gemini
+goco models --provider groq
 ```
 
 ### Interactive Features
@@ -73,6 +124,7 @@ goco generate -v
 - **Loading Indicator**: Beautiful animated spinner while generating messages
 - **Styled Output**: Commit messages appear in elegant green-bordered boxes
 - **Git Info**: Verbose mode shows git status and diff in separate styled containers
+- **Auto-Commit**: After generating, GoCo automatically stages and commits your changes
 
 ## ⚙️ Configuration
 
@@ -82,21 +134,34 @@ GoCo uses a TOML configuration file located at `~/.config/goco/config.toml` (fol
 
 ```toml
 # ~/.config/goco/config.toml
-gemini_key_env = "GOCO_GEMINI_KEY"
+api_key_gemini_env_variable = "GOCO_GEMINI_KEY"
+api_key_groq_env_variable = "GOCO_GROQ_KEY"
+default_provider = "gemini"
 ```
 
-### Custom Environment Variable
+### Custom Environment Variables
 
-You can customize which environment variable GoCo looks for:
+You can customize which environment variable GoCo looks for for each provider:
 
 ```toml
-# Use a different environment variable name
-gemini_key_env = "MY_CUSTOM_GEMINI_KEY"
+# Use different environment variable names
+api_key_gemini_env_variable = "MY_CUSTOM_GEMINI_KEY"
+api_key_groq_env_variable = "MY_CUSTOM_GROQ_KEY"
 ```
 
-Then set your custom variable:
+Then set your custom variables:
 ```bash
 export MY_CUSTOM_GEMINI_KEY="your-api-key-here"
+export MY_CUSTOM_GROQ_KEY="your-api-key-here"
+```
+
+### Setting Default Provider
+
+You can set a default AI provider in your configuration:
+
+```toml
+# Set Groq as the default provider
+default_provider = "groq"
 ```
 
 ### Environment Variables
@@ -104,6 +169,7 @@ export MY_CUSTOM_GEMINI_KEY="your-api-key-here"
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `GOCO_GEMINI_KEY` | - | Your Google Gemini API key |
+| `GOCO_GROQ_KEY` | - | Your Groq API key |
 | `XDG_CONFIG_HOME` | `~/.config` | Base directory for config files |
 
 ## 🎨 Example Output
@@ -154,13 +220,15 @@ go mod tidy
 
 ## 🛠️ Tech Stack
 
-- **Language**: Go 1.21+
+- **Language**: Go 1.24+
 - **CLI Framework**: [Cobra](https://github.com/spf13/cobra)
 - **TUI Components**: [Charm Bracelet](https://charm.sh/)
   - [Huh](https://github.com/charmbracelet/huh) - Interactive forms
   - [Lipgloss](https://github.com/charmbracelet/lipgloss) - Style definitions
   - [Bubbles](https://github.com/charmbracelet/bubbles) - TUI components
-- **AI**: Google Gemini API
+- **AI Providers**: 
+  - [Google Gemini API](https://ai.google.dev/)
+  - [Groq API](https://console.groq.com/) (Llama models)
 - **Config**: [Viper](https://github.com/spf13/viper) with TOML
 
 ## 📝 Conventional Commits
@@ -201,6 +269,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Conventional Commits](https://www.conventionalcommits.org/) for the commit message standard
 - [Charm Bracelet](https://charm.sh/) for the amazing TUI libraries
 - [Google](https://ai.google.dev/) for the Gemini AI API
+- [Groq](https://console.groq.com/) for the fast Llama models
 - The Go community for excellent tooling and libraries
 
 ---
