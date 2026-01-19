@@ -15,7 +15,7 @@ var cfg *config.Config
 var rootCmd = &cobra.Command{
 	Use:   "goco",
 	Short: "A conventional commit generator",
-	Long:  `A CLI tool to generate conventional commit messages using Google Gemini.`,
+	Long:  `A CLI tool to generate conventional commit messages using AI (Gemini or Groq).`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
