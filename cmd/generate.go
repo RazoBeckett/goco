@@ -25,6 +25,7 @@ var (
 	stagged            bool
 	verbose            bool
 	customInstructions string
+	edit               bool
 )
 
 var (
@@ -171,6 +172,61 @@ func promptForApiKey(envVar, providerName string) (string, error) {
 	return apiKey, nil
 }
 
+func editCommitMessage(message string) (string, error) {
+	tmpFile, err := os.CreateTemp("", "goco-commit-*.txt")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
+
+	if _, err := tmpFile.WriteString(message); err != nil {
+		tmpFile.Close()
+		return "", fmt.Errorf("failed to write to temp file: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return "", fmt.Errorf("failed to close temp file: %w", err)
+	}
+
+	editor := os.Getenv("EDITOR")
+	if editor == "" {
+		editor = os.Getenv("VISUAL")
+	}
+	if editor == "" {
+		editors := []string{"vim", "nano", "vi"}
+		for _, e := range editors {
+			if _, err := exec.LookPath(e); err == nil {
+				editor = e
+				break
+			}
+		}
+	}
+	if editor == "" {
+		return "", fmt.Errorf("no editor found. Please set EDITOR environment variable")
+	}
+
+	editCmd := exec.Command(editor, tmpPath)
+	editCmd.Stdin = os.Stdin
+	editCmd.Stdout = os.Stdout
+	editCmd.Stderr = os.Stderr
+
+	if err := editCmd.Run(); err != nil {
+		return "", fmt.Errorf("editor failed: %w", err)
+	}
+
+	editedContent, err := os.ReadFile(tmpPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read edited message: %w", err)
+	}
+
+	editedMessage := strings.TrimSpace(string(editedContent))
+	if editedMessage == "" {
+		return message, nil
+	}
+
+	return editedMessage, nil
+}
+
 var generateCmd = &cobra.Command{
 	Use:   "generate",
 	Short: "Generate a commit message using AI",
@@ -314,9 +370,19 @@ var generateCmd = &cobra.Command{
 			log.Fatalf("AI API error: %v", err)
 		}
 
-		// Show the commit message in a beautiful green box
 		fmt.Println(commitMessageHeaderStyle.Render("✅ Generated Commit Message"))
 		fmt.Println(commitMessageBoxStyle.Render(commitMessage))
+
+		if edit {
+			fmt.Println(titleStyle.Render("✏️  Editing Commit Message"))
+			editedMessage, err := editCommitMessage(commitMessage)
+			if err != nil {
+				log.Fatalf("Failed to edit commit message: %v", err)
+			}
+			commitMessage = editedMessage
+			fmt.Println(commitMessageHeaderStyle.Render("✅ Final Commit Message"))
+			fmt.Println(commitMessageBoxStyle.Render(commitMessage))
+		}
 
 		if err := exec.Command("git", "add", "-u").Run(); err != nil {
 			log.Fatalf("Failed to stage changes %v", err)
@@ -341,6 +407,7 @@ func init() {
 	generateCmd.Flags().BoolVarP(&stagged, "stagged", "s", false, "stagged changes")
 	generateCmd.Flags().BoolVar(&verbose, "verbose", false, "Show detailed output including prompts")
 	generateCmd.Flags().StringVarP(&customInstructions, "custom-instructions", "c", "", "Custom instructions to add to the prompt")
+	generateCmd.Flags().BoolVarP(&edit, "edit", "e", false, "Edit the commit message before committing")
 
 	rootCmd.AddCommand(generateCmd)
 }
