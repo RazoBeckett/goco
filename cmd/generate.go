@@ -16,12 +16,15 @@ import (
 )
 
 var (
-	apiKey             string
-	provider           string
-	model              string
-	commitType         string
-	breakingChange     bool
-	stagged            bool
+	apiKey         string
+	provider       string
+	model          string
+	commitType     string
+	breakingChange bool
+	stagged        bool
+	// Deprecated: stagedFlag is the correct spelling. We keep stagged for
+	// backward compatibility but also register --staged as the preferred flag.
+	stagedFlag         bool
 	verbose            bool
 	customInstructions string
 	edit               bool
@@ -112,6 +115,21 @@ func (m spinnerModel) View() string {
 		return ""
 	}
 	return fmt.Sprintf("%s %s", m.spinner.View(), m.message)
+}
+
+// getStagedFiles returns the list of paths currently staged for commit in the
+// repository at dir. If dir is empty the current working directory is used.
+func getStagedFiles(dir string) ([]string, error) {
+	cmd := exec.Command("git", "diff", "--name-only", "--cached")
+	if dir != "" {
+		cmd.Dir = dir
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	s := strings.Fields(strings.TrimSpace(string(out)))
+	return s, nil
 }
 
 func newSpinnerModel(message string) spinnerModel {
@@ -366,7 +384,9 @@ var generateCmd = &cobra.Command{
 
 		// Get git diff
 		var gitDiff *exec.Cmd
-		if stagged {
+		// Accept either flag; stagedFlag is the preferred spelling.
+		useStaged := stagged || stagedFlag
+		if useStaged {
 			gitDiff = exec.Command("git", "diff", "--no-color", "--staged")
 		} else {
 			gitDiff = exec.Command("git", "diff", "--no-color")
@@ -437,15 +457,59 @@ var generateCmd = &cobra.Command{
 			fmt.Println(commitMessageBoxStyle.Render(commitMessage))
 		}
 
-		if err := exec.Command("git", "add", "-u").Run(); err != nil {
-			return &GitError{
-				Command: "git add -u",
-				Message: "failed to stage changes",
-				Err:     err,
+		// Only update the index for modified tracked files when not explicitly
+		// requesting to use the already staged changes. If the user passed the
+		// --stagged/--staged flag we must NOT modify the index, otherwise we
+		// risk including unstaged changes in the commit (this was the bug).
+		useStaged = stagged || stagedFlag
+
+		if !useStaged {
+			if err := exec.Command("git", "add", "-u").Run(); err != nil {
+				return &GitError{
+					Command: "git add -u",
+					Message: "failed to stage changes",
+					Err:     err,
+				}
 			}
+		} else if verbose {
+			fmt.Println("Using staged changes only; skipping 'git add -u'")
 		}
 
-		final := exec.Command("git", "commit", "-m", commitMessage)
+		// When using staged changes, we must ensure the commit only contains
+		// files currently in the index. Otherwise `git commit` will include
+		// unstaged modifications if `git add` was run earlier. To be explicit,
+		// when stagged is set we pass `--only` with a list of staged files.
+
+		var final *exec.Cmd
+		if useStaged {
+			// Get the list of staged files
+			stagedListCmd := exec.Command("git", "diff", "--name-only", "--cached")
+			stagedOut, err := stagedListCmd.Output()
+			if err != nil {
+				return &GitError{
+					Command: "git diff --name-only --cached",
+					Message: "failed to list staged files",
+					Err:     err,
+				}
+			}
+
+			stagedFiles := strings.Fields(strings.TrimSpace(string(stagedOut)))
+			if len(stagedFiles) == 0 {
+				return &GitError{
+					Command: "git diff --name-only --cached",
+					Message: "no staged changes to commit",
+					Err:     ErrGitRepository,
+				}
+			}
+
+			// `git commit --only <path>...` commits only the specified paths
+			// from the index. Build args as: commit -m <msg> --only -- <paths...>
+			args := []string{"commit", "-m", commitMessage, "--only", "--"}
+			args = append(args, stagedFiles...)
+			final = exec.Command("git", args...)
+		} else {
+			final = exec.Command("git", "commit", "-m", commitMessage)
+		}
 		final.Stdout = os.Stdout
 		final.Stderr = os.Stderr
 
@@ -467,7 +531,10 @@ func init() {
 	generateCmd.Flags().StringVarP(&model, "model", "m", "", "Model to use (defaults: gemini-2.5-flash for Gemini, llama-3.3-70b-versatile for Groq)")
 	generateCmd.Flags().StringVarP(&commitType, "type", "t", "", "Commit type (feat, fix, chore, etc.)")
 	generateCmd.Flags().BoolVarP(&breakingChange, "breaking-change", "b", false, "Mark commit as breaking change")
-	generateCmd.Flags().BoolVarP(&stagged, "stagged", "s", false, "stagged changes")
+	// Register both spellings: --staged (correct) and --stagged (typo kept
+	// for backward compatibility). Prefer --staged in help and docs.
+	generateCmd.Flags().BoolVarP(&stagged, "stagged", "s", false, "stagged changes (deprecated spelling)")
+	generateCmd.Flags().BoolVar(&stagedFlag, "staged", false, "staged changes (preferred)")
 	generateCmd.Flags().BoolVar(&verbose, "verbose", false, "Show detailed output including prompts")
 	generateCmd.Flags().StringVarP(&customInstructions, "custom-instructions", "c", "", "Custom instructions to add to the prompt")
 	generateCmd.Flags().BoolVarP(&edit, "edit", "e", false, "Edit the commit message before committing")

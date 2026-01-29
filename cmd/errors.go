@@ -29,8 +29,8 @@ func (e *ConfigError) Error() string {
 
 type ProviderError struct {
 	Provider string
-	Message string
-	Err     error
+	Message  string
+	Err      error
 }
 
 func (e *ProviderError) Error() string {
