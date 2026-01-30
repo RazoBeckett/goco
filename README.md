@@ -139,6 +139,21 @@ api_key_groq_env_variable = "GOCO_GROQ_KEY"
 default_provider = "gemini"
 ```
 
+Note: The config file follows a [General] TOML table in the application configuration.
+When using a full config file, prefer the following structure under a [General]
+header to avoid ambiguity with top-level keys:
+
+```toml
+[General]
+api_key_gemini_env_variable = "GOCO_GEMINI_KEY"
+api_key_groq_env_variable = "GOCO_GROQ_KEY"
+default_provider = "gemini"
+```
+
+This README snippet documents the configuration format used by config.LoadConfig and
+helps users migrate from older top-level keys to the new [General] table if they
+previously placed these keys at the top level of the file.
+
 ### Custom Environment Variables
 
 You can customize which environment variable GoCo looks for for each provider:
