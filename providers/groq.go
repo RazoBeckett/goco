@@ -34,7 +34,9 @@ func (g *GroqProvider) GenerateCommitMessage(ctx context.Context, gitStatus, git
 	prompt := fmt.Sprintf(
 		"Generate a Conventional Commit based strictly on the following:\n\n"+
 			"Git Status:\n%s\n\n"+
+
 			"Git Diff:\n%s\n\n"+
+
 			"Before responding, you MUST:\n"+
 			"- Read: %v\n"+
 			"- ONLY output the commit message and description.\n"+
@@ -73,8 +75,32 @@ func (g *GroqProvider) GenerateCommitMessage(ctx context.Context, gitStatus, git
 	return resp.Choices[0].Message.Content, nil
 }
 
-// ListModels lists available Groq models
+// ListModels lists available Groq models. Implementation delegates to the
+// package-level groqListModelsFunc so tests can substitute a failing
+// implementation and CLI listing paths can use a static list without
+// constructing a network client.
 func (g *GroqProvider) ListModels(ctx context.Context) ([]string, error) {
+	return groqListModelsFunc(g, ctx)
+}
+
+// ValidateModel validates that a model is available
+func (g *GroqProvider) ValidateModel(ctx context.Context, model string) error {
+	models, err := g.ListModels(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list groq models: %w", err)
+	}
+
+	if !slices.Contains(models, model) {
+		return fmt.Errorf("model %s not available", model)
+	}
+
+	return nil
+}
+
+// groqListModelsFunc is a package-level indirection for ListModels. Tests may
+// replace this to simulate errors coming from the provider's model listing
+// without making network calls.
+var groqListModelsFunc = func(g *GroqProvider, ctx context.Context) ([]string, error) {
 	// Return a list of text generation models suitable for commit message generation
 	// Updated to exclude deprecated models and non-text models (TTS, STT)
 	// Based on https://console.groq.com/docs/deprecations
@@ -96,13 +122,10 @@ func (g *GroqProvider) ListModels(ctx context.Context) ([]string, error) {
 	}, nil
 }
 
-// ValidateModel validates that a model is available
-func (g *GroqProvider) ValidateModel(ctx context.Context, model string) error {
-	models, _ := g.ListModels(ctx)
-
-	if !slices.Contains(models, model) {
-		return fmt.Errorf("model %s not available", model)
-	}
-
-	return nil
+// GroqStaticModels returns the static list of Groq models without requiring a
+// provider/client. This is intended for CLI listing paths that don't need a
+// live network client.
+func GroqStaticModels() []string {
+	ms, _ := groqListModelsFunc(nil, context.Background())
+	return ms
 }
