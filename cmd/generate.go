@@ -530,6 +530,17 @@ func init() {
 	generateCmd.Flags().StringVarP(&model, "model", "m", "", "Model to use (defaults: gemini-2.5-flash for Gemini, llama-3.3-70b-versatile for Groq)")
 	generateCmd.Flags().StringVarP(&commitType, "type", "t", "", "Commit type (feat, fix, chore, etc.)")
 	generateCmd.Flags().BoolVarP(&breakingChange, "breaking-change", "b", false, "Mark commit as breaking change")
+	// These flags are currently unused by the CLI logic and are deprecated.
+	// Keep them present for backwards compatibility but mark as deprecated so
+	// users see a deprecation notice in help output.
+	if f := generateCmd.Flags().Lookup("type"); f != nil {
+		_ = f.Deprecated // access to avoid lint unused warning
+		_ = generateCmd.Flags().MarkDeprecated("type", "flag is unused and will be removed in a future release")
+	}
+	if f := generateCmd.Flags().Lookup("breaking-change"); f != nil {
+		_ = f.Deprecated
+		_ = generateCmd.Flags().MarkDeprecated("breaking-change", "flag is unused and will be removed in a future release")
+	}
 	// Register only the correctly spelled --staged flag (shorthand -s).
 	generateCmd.Flags().BoolVarP(&staged, "staged", "s", false, "staged changes")
 	generateCmd.Flags().BoolVar(&verbose, "verbose", false, "Show detailed output including prompts")
