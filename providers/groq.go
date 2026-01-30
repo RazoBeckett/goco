@@ -75,6 +75,30 @@ func (g *GroqProvider) GenerateCommitMessage(ctx context.Context, gitStatus, git
 
 // ListModels lists available Groq models
 func (g *GroqProvider) ListModels(ctx context.Context) ([]string, error) {
+	// Default implementation returns a static list of supported models.
+	// This function is delegated to the package-level groqListModelsFunc so
+	// tests can substitute a failing implementation to simulate provider errors.
+	return groqListModelsFunc(g, ctx)
+}
+
+// ValidateModel validates that a model is available
+func (g *GroqProvider) ValidateModel(ctx context.Context, model string) error {
+	models, err := g.ListModels(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list groq models: %w", err)
+	}
+
+	if !slices.Contains(models, model) {
+		return fmt.Errorf("model %s not available", model)
+	}
+
+	return nil
+}
+
+// groqListModelsFunc is a package-level indirection for ListModels. Tests may
+// replace this to simulate errors coming from the provider's model listing
+// without making network calls.
+var groqListModelsFunc = func(g *GroqProvider, ctx context.Context) ([]string, error) {
 	// Return a list of text generation models suitable for commit message generation
 	// Updated to exclude deprecated models and non-text models (TTS, STT)
 	// Based on https://console.groq.com/docs/deprecations
@@ -94,15 +118,4 @@ func (g *GroqProvider) ListModels(ctx context.Context) ([]string, error) {
 		"moonshotai/kimi-k2-instruct-0905",
 		"qwen/qwen3-32b",
 	}, nil
-}
-
-// ValidateModel validates that a model is available
-func (g *GroqProvider) ValidateModel(ctx context.Context, model string) error {
-	models, _ := g.ListModels(ctx)
-
-	if !slices.Contains(models, model) {
-		return fmt.Errorf("model %s not available", model)
-	}
-
-	return nil
 }
