@@ -80,6 +80,9 @@ func (g *GroqProvider) GenerateCommitMessage(ctx context.Context, gitStatus, git
 // implementation and CLI listing paths can use a static list without
 // constructing a network client.
 func (g *GroqProvider) ListModels(ctx context.Context) ([]string, error) {
+	// Default implementation returns a static list of supported models.
+	// This function is delegated to the package-level groqListModelsFunc so
+	// tests can substitute a failing implementation to simulate provider errors.
 	return groqListModelsFunc(g, ctx)
 }
 
