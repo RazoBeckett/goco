@@ -50,11 +50,9 @@ var modelsCmd = &cobra.Command{
 		switch modelListProvider {
 		case "groq":
 			providerDisplayName = "Groq"
-			// For Groq, we don't need an API key to list models since they're hardcoded
-			aiProvider, err = providers.NewGroqProvider(ctx, "dummy-key", "llama-3.3-70b-versatile")
-			if err != nil {
-				log.Fatalf("Failed to create Groq provider: %v", err)
-			}
+			// For Groq, we don't need an API key to list models since they're hardcoded.
+			// Use the static model list to avoid constructing a client when only listing.
+			// models will be filled below when aiProvider is nil.
 
 		case "gemini":
 			providerDisplayName = "Gemini"
@@ -83,9 +81,17 @@ var modelsCmd = &cobra.Command{
 		}
 
 		// Get available models
-		models, err := aiProvider.ListModels(ctx)
-		if err != nil {
-			log.Fatalf("Failed to list models: %v", err)
+		var models []string
+		if aiProvider != nil {
+			var err error
+			models, err = aiProvider.ListModels(ctx)
+			if err != nil {
+				log.Fatalf("Failed to list models: %v", err)
+			}
+		} else {
+			// For providers that don't require a client to list models (e.g. Groq),
+			// call the exported static helper.
+			models = providers.GroqStaticModels()
 		}
 
 		// Display models
