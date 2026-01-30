@@ -21,10 +21,9 @@ var (
 	model          string
 	commitType     string
 	breakingChange bool
-	stagged        bool
-	// Deprecated: stagedFlag is the correct spelling. We keep stagged for
-	// backward compatibility but also register --staged as the preferred flag.
-	stagedFlag         bool
+	// Use the correctly spelled `staged` flag only. The old `--stagged`
+	// alias has been removed.
+	staged             bool
 	verbose            bool
 	customInstructions string
 	edit               bool
@@ -384,8 +383,8 @@ var generateCmd = &cobra.Command{
 
 		// Get git diff
 		var gitDiff *exec.Cmd
-		// Accept either flag; stagedFlag is the preferred spelling.
-		useStaged := stagged || stagedFlag
+		// Use the single `staged` flag.
+		useStaged := staged
 		if useStaged {
 			gitDiff = exec.Command("git", "diff", "--no-color", "--staged")
 		} else {
@@ -459,9 +458,9 @@ var generateCmd = &cobra.Command{
 
 		// Only update the index for modified tracked files when not explicitly
 		// requesting to use the already staged changes. If the user passed the
-		// --stagged/--staged flag we must NOT modify the index, otherwise we
+		// --staged flag we must NOT modify the index, otherwise we
 		// risk including unstaged changes in the commit (this was the bug).
-		useStaged = stagged || stagedFlag
+		useStaged = staged
 
 		if !useStaged {
 			if err := exec.Command("git", "add", "-u").Run(); err != nil {
@@ -478,7 +477,7 @@ var generateCmd = &cobra.Command{
 		// When using staged changes, we must ensure the commit only contains
 		// files currently in the index. Otherwise `git commit` will include
 		// unstaged modifications if `git add` was run earlier. To be explicit,
-		// when stagged is set we pass `--only` with a list of staged files.
+		// when staged is set we pass `--only` with a list of staged files.
 
 		var final *exec.Cmd
 		if useStaged {
@@ -531,10 +530,8 @@ func init() {
 	generateCmd.Flags().StringVarP(&model, "model", "m", "", "Model to use (defaults: gemini-2.5-flash for Gemini, llama-3.3-70b-versatile for Groq)")
 	generateCmd.Flags().StringVarP(&commitType, "type", "t", "", "Commit type (feat, fix, chore, etc.)")
 	generateCmd.Flags().BoolVarP(&breakingChange, "breaking-change", "b", false, "Mark commit as breaking change")
-	// Register both spellings: --staged (correct) and --stagged (typo kept
-	// for backward compatibility). Prefer --staged in help and docs.
-	generateCmd.Flags().BoolVarP(&stagged, "stagged", "s", false, "stagged changes (deprecated spelling)")
-	generateCmd.Flags().BoolVar(&stagedFlag, "staged", false, "staged changes (preferred)")
+	// Register only the correctly spelled --staged flag (shorthand -s).
+	generateCmd.Flags().BoolVarP(&staged, "staged", "s", false, "staged changes")
 	generateCmd.Flags().BoolVar(&verbose, "verbose", false, "Show detailed output including prompts")
 	generateCmd.Flags().StringVarP(&customInstructions, "custom-instructions", "c", "", "Custom instructions to add to the prompt")
 	generateCmd.Flags().BoolVarP(&edit, "edit", "e", false, "Edit the commit message before committing")
