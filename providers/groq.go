@@ -34,7 +34,9 @@ func (g *GroqProvider) GenerateCommitMessage(ctx context.Context, gitStatus, git
 	prompt := fmt.Sprintf(
 		"Generate a Conventional Commit based strictly on the following:\n\n"+
 			"Git Status:\n%s\n\n"+
+
 			"Git Diff:\n%s\n\n"+
+
 			"Before responding, you MUST:\n"+
 			"- Read: %v\n"+
 			"- ONLY output the commit message and description.\n"+
@@ -73,7 +75,10 @@ func (g *GroqProvider) GenerateCommitMessage(ctx context.Context, gitStatus, git
 	return resp.Choices[0].Message.Content, nil
 }
 
-// ListModels lists available Groq models
+// ListModels lists available Groq models. Implementation delegates to the
+// package-level groqListModelsFunc so tests can substitute a failing
+// implementation and CLI listing paths can use a static list without
+// constructing a network client.
 func (g *GroqProvider) ListModels(ctx context.Context) ([]string, error) {
 	// Default implementation returns a static list of supported models.
 	// This function is delegated to the package-level groqListModelsFunc so
