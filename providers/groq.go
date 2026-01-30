@@ -119,3 +119,11 @@ var groqListModelsFunc = func(g *GroqProvider, ctx context.Context) ([]string, e
 		"qwen/qwen3-32b",
 	}, nil
 }
+
+// GroqStaticModels returns the static list of Groq models without requiring a
+// provider/client. This is intended for CLI listing paths that don't need a
+// live network client.
+func GroqStaticModels() []string {
+	ms, _ := groqListModelsFunc(nil, context.Background())
+	return ms
+}
