@@ -104,9 +104,6 @@ func (g *GroqProvider) ValidateModel(ctx context.Context, model string) error {
 // replace this to simulate errors coming from the provider's model listing
 // without making network calls.
 var groqListModelsFunc = func(g *GroqProvider, ctx context.Context) ([]string, error) {
-	// Return a list of text generation models suitable for commit message generation
-	// Updated to exclude deprecated models and non-text models (TTS, STT)
-	// Based on https://console.groq.com/docs/deprecations
 	return []string{
 		// Compound/Systems (Agentic AI) - Production
 		"groq/compound",
@@ -121,7 +118,12 @@ var groqListModelsFunc = func(g *GroqProvider, ctx context.Context) ([]string, e
 		"meta-llama/llama-4-maverick-17b-128e-instruct",
 		"meta-llama/llama-4-scout-17b-16e-instruct",
 		"moonshotai/kimi-k2-instruct-0905",
+		"moonshotai/kimi-k2-instruct",
 		"qwen/qwen3-32b",
+		"deepseek-r1-distill-llama-70b",
+		"mistral-saba-24b",
+		"qwen-qwq-32b",
+		"meta-llama/llama-guard-4-12b",
 	}, nil
 }
 
