@@ -73,21 +73,36 @@ func (g *GeminiProvider) GenerateCommitMessage(ctx context.Context, gitStatus, g
 
 // ListModels lists available Gemini models
 func (g *GeminiProvider) ListModels(ctx context.Context) ([]string, error) {
-	models, err := g.client.Models.List(ctx, nil)
+	models, err := geminiListModelsFunc(g, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list models: %w", err)
 	}
 
 	var filtered []string
-	re := regexp.MustCompile(`^gemini-\d+\.\d+`)
-	for _, m := range models.Items {
+	re := regexp.MustCompile(`^gemini-`)
+	for _, m := range models {
 		name := strings.TrimPrefix(m.Name, "models/")
 		if re.MatchString(name) {
 			filtered = append(filtered, name)
 		}
 	}
 
+	if len(filtered) == 0 {
+		for _, m := range models {
+			name := strings.TrimPrefix(m.Name, "models/")
+			filtered = append(filtered, name)
+		}
+	}
+
 	return filtered, nil
+}
+
+var geminiListModelsFunc = func(g *GeminiProvider, ctx context.Context) ([]*genai.Model, error) {
+	models, err := g.client.Models.List(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	return models.Items, nil
 }
 
 // ValidateModel validates that a model is available
