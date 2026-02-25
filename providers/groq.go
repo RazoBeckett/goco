@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/conneroisu/groq-go"
+	"github.com/algolyzer/groq-go"
 )
 
 // GroqProvider implements the Provider interface for Groq
@@ -16,10 +16,7 @@ type GroqProvider struct {
 
 // NewGroqProvider creates a new Groq provider
 func NewGroqProvider(ctx context.Context, apiKey, model string) (*GroqProvider, error) {
-	client, err := groq.NewClient(apiKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create groq client: %w", err)
-	}
+	client := groq.NewClient(apiKey)
 
 	return &GroqProvider{
 		client: client,
@@ -34,9 +31,7 @@ func (g *GroqProvider) GenerateCommitMessage(ctx context.Context, gitStatus, git
 	prompt := fmt.Sprintf(
 		"Generate a Conventional Commit based strictly on the following:\n\n"+
 			"Git Status:\n%s\n\n"+
-
 			"Git Diff:\n%s\n\n"+
-
 			"Before responding, you MUST:\n"+
 			"- Read: %v\n"+
 			"- ONLY output the commit message and description.\n"+
@@ -55,9 +50,9 @@ func (g *GroqProvider) GenerateCommitMessage(ctx context.Context, gitStatus, git
 		prompt += fmt.Sprintf("\n\nAdditional Instructions:\n%s\n", customInstructions)
 	}
 
-	resp, err := g.client.ChatCompletion(ctx, groq.ChatCompletionRequest{
-		Model: groq.ChatModel(g.model),
-		Messages: []groq.ChatCompletionMessage{
+	resp, err := g.client.CreateChatCompletion(ctx, groq.ChatCompletionRequest{
+		Model: g.model,
+		Messages: []groq.ChatMessage{
 			{
 				Role:    groq.RoleUser,
 				Content: prompt,
@@ -75,18 +70,33 @@ func (g *GroqProvider) GenerateCommitMessage(ctx context.Context, gitStatus, git
 	return resp.Choices[0].Message.Content, nil
 }
 
-// ListModels lists available Groq models. Implementation delegates to the
-// package-level groqListModelsFunc so tests can substitute a failing
-// implementation and CLI listing paths can use a static list without
-// constructing a network client.
+// ListModels lists available Groq models by fetching from the API.
+// This allows users to see and select from all available models,
+// not just a hardcoded subset.
 func (g *GroqProvider) ListModels(ctx context.Context) ([]string, error) {
-	// Default implementation returns a static list of supported models.
-	// This function is delegated to the package-level groqListModelsFunc so
-	// tests can substitute a failing implementation to simulate provider errors.
-	return groqListModelsFunc(g, ctx)
+	resp, err := groqListModelsFunc(g, ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list groq models: %w", err)
+	}
+
+	var models []string
+	for _, model := range resp.Data {
+		if model.ID != "" {
+			models = append(models, model.ID)
+		}
+	}
+
+	return models, nil
 }
 
-// ValidateModel validates that a model is available
+// groqListModelsFunc is a package-level indirection for ListModels to allow
+// testing without making actual API calls.
+var groqListModelsFunc = func(g *GroqProvider, ctx context.Context) (*groq.ModelListResponse, error) {
+	return g.client.ListModels(ctx)
+}
+
+// ValidateModel validates that a model is available by checking against the API.
+// This allows users to use any model that Groq supports, not just hardcoded ones.
 func (g *GroqProvider) ValidateModel(ctx context.Context, model string) error {
 	models, err := g.ListModels(ctx)
 	if err != nil {
@@ -98,37 +108,4 @@ func (g *GroqProvider) ValidateModel(ctx context.Context, model string) error {
 	}
 
 	return nil
-}
-
-// groqListModelsFunc is a package-level indirection for ListModels. Tests may
-// replace this to simulate errors coming from the provider's model listing
-// without making network calls.
-var groqListModelsFunc = func(g *GroqProvider, ctx context.Context) ([]string, error) {
-	// Return a list of text generation models suitable for commit message generation
-	// Updated to exclude deprecated models and non-text models (TTS, STT)
-	// Based on https://console.groq.com/docs/deprecations
-	return []string{
-		// Compound/Systems (Agentic AI) - Production
-		"groq/compound",
-		"groq/compound-mini",
-		// Production Text Models
-		"llama-3.1-8b-instant",
-		"llama-3.3-70b-versatile",
-		"mixtral-8x7b-32768",
-		"openai/gpt-oss-120b",
-		"openai/gpt-oss-20b",
-		// Preview Text Models (may be deprecated with short notice)
-		"meta-llama/llama-4-maverick-17b-128e-instruct",
-		"meta-llama/llama-4-scout-17b-16e-instruct",
-		"moonshotai/kimi-k2-instruct-0905",
-		"qwen/qwen3-32b",
-	}, nil
-}
-
-// GroqStaticModels returns the static list of Groq models without requiring a
-// provider/client. This is intended for CLI listing paths that don't need a
-// live network client.
-func GroqStaticModels() []string {
-	ms, _ := groqListModelsFunc(nil, context.Background())
-	return ms
 }

@@ -71,18 +71,30 @@ func (g *GeminiProvider) GenerateCommitMessage(ctx context.Context, gitStatus, g
 	return resp.Text(), nil
 }
 
-// ListModels lists available Gemini models
+// ListModels lists available Gemini models by fetching from the Google API.
+// This returns all models that start with "gemini-" and fallbacks to all
+// models if no gemini models are found. This allows users to select from
+// any available model, not just a hardcoded subset.
 func (g *GeminiProvider) ListModels(ctx context.Context) ([]string, error) {
-	models, err := g.client.Models.List(ctx, nil)
+	page, err := geminiListModelsFunc(g, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list models: %w", err)
 	}
 
 	var filtered []string
-	re := regexp.MustCompile(`^gemini-\d+\.\d+`)
-	for _, m := range models.Items {
+	re := regexp.MustCompile(`^gemini-`)
+
+	for _, m := range page.Items {
 		name := strings.TrimPrefix(m.Name, "models/")
 		if re.MatchString(name) {
+			filtered = append(filtered, name)
+		}
+	}
+
+	// Fallback: if no gemini models found, return all models
+	if len(filtered) == 0 {
+		for _, m := range page.Items {
+			name := strings.TrimPrefix(m.Name, "models/")
 			filtered = append(filtered, name)
 		}
 	}
@@ -90,7 +102,14 @@ func (g *GeminiProvider) ListModels(ctx context.Context) ([]string, error) {
 	return filtered, nil
 }
 
-// ValidateModel validates that a model is available
+// geminiListModelsFunc is a package-level indirection for ListModels to allow
+// testing without making actual API calls.
+var geminiListModelsFunc = func(g *GeminiProvider, ctx context.Context) (genai.Page[genai.Model], error) {
+	return g.client.Models.List(ctx, nil)
+}
+
+// ValidateModel validates that a model is available by checking against the API.
+// This allows users to use any model that Google supports.
 func (g *GeminiProvider) ValidateModel(ctx context.Context, model string) error {
 	models, err := g.ListModels(ctx)
 	if err != nil {
