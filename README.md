@@ -1,4 +1,4 @@
-# GoCo 🚀
+# GoCo <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Microsoft-Teams-Animated-Emojis/master/Emojis/Travel%20and%20places/Rocket.png" alt="Rocket" width="25" height="25" />
 
 **Go Conventional** - AI-powered conventional commit message generator with a beautiful Terminal User Interface.
 
@@ -6,18 +6,18 @@ GoCo transforms your git workflow by automatically generating meaningful convent
 
 ![GOCO_PREVIEW](demo.gif)
 
-## ✨ Features
+## Features
 
-- 🤖 **Multi-Provider AI**: Choose between Google Gemini or Groq (Llama models) for commit message generation
-- 🎨 **Beautiful TUI**: Modern terminal interface with styled output, loading spinners, and interactive prompts
-- 🔒 **Secure Input**: Password-masked API key prompts when credentials are missing
-- ⚙️ **Smart Config**: TOML-based configuration with XDG Base Directory support and multi-provider support
-- 👁️ **Verbose Mode**: Optional detailed view of git status and diff in styled boxes
-- 🎯 **Zero Setup**: Works out of the box with minimal configuration
-- 🔧 **Custom Instructions**: Add custom instructions to tailor commit messages to your needs
-- 📋 **Model Selection**: List and select from available AI models for each provider
+- **Multi-Provider AI**: Choose between Google Gemini or Groq (Llama models) for commit message generation
+- **Beautiful TUI**: Modern terminal interface with styled output, loading spinners, and interactive prompts
+- **Secure Input**: Password-masked API key prompts when credentials are missing
+- **Smart Config**: TOML-based configuration with XDG Base Directory support and multi-provider support
+- **Verbose Mode**: Optional detailed view of git status and diff in styled boxes
+- **Zero Setup**: Works out of the box with minimal configuration
+- **Custom Instructions**: Add custom instructions to tailor commit messages to your needs
+- **Model Selection**: List and select from available AI models for each provider
 
-## 📦 Installation
+## Installation
 
 ### From Source
 
@@ -34,7 +34,7 @@ sudo mv goco /usr/local/bin/  # Optional: install globally
 go install github.com/RazoBeckett/goco@latest
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 1. **Choose your AI provider and set up your API key**:
 
@@ -80,7 +80,7 @@ go install github.com/RazoBeckett/goco@latest
 
 That's it! GoCo will analyze your staged changes and generate a beautiful conventional commit message, then automatically commit it.
 
-## 💡 Usage
+## Usage
 
 ### Basic Usage
 
@@ -105,6 +105,12 @@ goco generate --custom-instructions "make the message concise"
 
 # Use staged diff instead of working directory
 goco generate --staged
+
+# Chain flags: verbose + staged + skip confirmation
+goco -vsy
+
+# Create new branch and commit
+goco -B feature/new-feature
 ```
 
 ### Listing Available Models
@@ -124,9 +130,10 @@ goco models --provider groq
 - **Loading Indicator**: Beautiful animated spinner while generating messages
 - **Styled Output**: Commit messages appear in elegant green-bordered boxes
 - **Git Info**: Verbose mode shows git status and diff in separate styled containers
+- **Confirmation Prompt**: Review the generated commit message before committing (skip with -y flag)
 - **Auto-Commit**: After generating, GoCo automatically stages and commits your changes
 
-## ⚙️ Configuration
+## Configuration
 
 GoCo uses a TOML configuration file located at `~/.config/goco/config.toml` (following XDG Base Directory specification).
 
@@ -187,7 +194,7 @@ default_provider = "groq"
 | `GOCO_GROQ_KEY` | - | Your Groq API key |
 | `XDG_CONFIG_HOME` | `~/.config` | Base directory for config files |
 
-## 🎨 Example Output
+## Example Output
 
 ### Standard Mode
 ```
@@ -202,11 +209,11 @@ default_provider = "groq"
 
 ### Verbose Mode
 Shows additional styled boxes with:
-- 📊 **Git Status**: Current repository status in a blue-bordered box
-- 📝 **Git Diff**: Detailed changes in a yellow-bordered box
-- ✅ **Commit Message**: Generated message in a green-bordered box
+- **Git Status**: Current repository status in a blue-bordered box
+- **Git Diff**: Detailed changes in a yellow-bordered box
+- **Commit Message**: Generated message in a green-bordered box
 
-## 🔧 Development
+## Development
 
 ### Building
 
@@ -233,7 +240,7 @@ go fmt ./...
 go mod tidy
 ```
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Language**: Go 1.24+
 - **CLI Framework**: [Cobra](https://github.com/spf13/cobra)
@@ -246,7 +253,7 @@ go mod tidy
   - [Groq API](https://console.groq.com/) (Llama models)
 - **Config**: [Viper](https://github.com/spf13/viper) with TOML
 
-## 📝 Conventional Commits
+## Conventional Commits
 
 GoCo generates commits following the [Conventional Commits](https://www.conventionalcommits.org/) specification:
 
@@ -267,7 +274,7 @@ GoCo generates commits following the [Conventional Commits](https://www.conventi
 - `test`: Adding or modifying tests
 - `chore`: Maintenance tasks
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feat/amazing-feature`
@@ -275,11 +282,11 @@ GoCo generates commits following the [Conventional Commits](https://www.conventi
 4. Push to the branch: `git push origin feat/amazing-feature`
 5. Open a Pull Request
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - [Conventional Commits](https://www.conventionalcommits.org/) for the commit message standard
 - [Charm Bracelet](https://charm.sh/) for the amazing TUI libraries
@@ -289,4 +296,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-Made with ❤️ and Go. Transform your git workflow today!
+Made with <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Microsoft-Teams-Animated-Emojis/master/Emojis/Smilies/Red%20Heart.png" alt="Red Heart" width="20" height="20" /> and Go. Transform your git workflow today!
