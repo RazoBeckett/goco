@@ -27,6 +27,8 @@ var (
 	verbose            bool
 	customInstructions string
 	edit               bool
+	noConfirm          bool
+	newBranch          string
 )
 
 var (
@@ -456,6 +458,60 @@ var generateCmd = &cobra.Command{
 			fmt.Println(commitMessageBoxStyle.Render(commitMessage))
 		}
 
+		// Create new branch if specified
+		if newBranch != "" {
+			// Get current branch name
+			currentBranchCmd := exec.Command("git", "branch", "--show-current")
+			currentBranchOutput, err := currentBranchCmd.Output()
+			if err != nil {
+				return &GitError{
+					Command: "git branch --show-current",
+					Message: "failed to get current branch name",
+					Err:     err,
+				}
+			}
+			currentBranch := strings.TrimSpace(string(currentBranchOutput))
+
+			// Create and checkout new branch
+			checkoutCmd := exec.Command("git", "checkout", "-b", newBranch)
+			checkoutCmd.Stdout = os.Stdout
+			checkoutCmd.Stderr = os.Stderr
+			if err := checkoutCmd.Run(); err != nil {
+				return &GitError{
+					Command: "git checkout -b",
+					Message: "failed to create new branch",
+					Err:     err,
+				}
+			}
+
+			if verbose {
+				fmt.Printf("\n✅ Created and switched to new branch '%s' from '%s'\n\n", newBranch, currentBranch)
+			}
+		}
+
+		// Confirmation prompt (unless --noconfirm is passed)
+		if !noConfirm {
+			var confirmed bool
+			confirmForm := huh.NewForm(
+				huh.NewGroup(
+					huh.NewConfirm().
+						Title("Do you want to proceed with this commit?").
+						Value(&confirmed).
+						Affirmative("Yes").
+						Negative("No"),
+				),
+			)
+
+			if err := confirmForm.Run(); err != nil {
+				return fmt.Errorf("confirmation prompt failed: %w", err)
+			}
+
+			if !confirmed {
+				fmt.Println(noteStyle.Render("\n❌ Commit cancelled by user"))
+				return nil
+			}
+		}
+
 		// Only update the index for modified tracked files when not explicitly
 		// requesting to use the already staged changes. If the user passed the
 		// --staged flag we must NOT modify the index, otherwise we
@@ -543,9 +599,11 @@ func init() {
 	}
 	// Register only the correctly spelled --staged flag (shorthand -s).
 	generateCmd.Flags().BoolVarP(&staged, "staged", "s", false, "staged changes")
-	generateCmd.Flags().BoolVar(&verbose, "verbose", false, "Show detailed output including prompts")
+	generateCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show detailed output including prompts")
+	generateCmd.Flags().BoolVarP(&noConfirm, "noconfirm", "y", false, "Skip confirmation prompt and commit immediately")
 	generateCmd.Flags().StringVarP(&customInstructions, "custom-instructions", "c", "", "Custom instructions to add to the prompt")
 	generateCmd.Flags().BoolVarP(&edit, "edit", "e", false, "Edit the commit message before committing")
+	generateCmd.Flags().StringVarP(&newBranch, "branch", "B", "", "Create a new branch with current branch as parent before committing")
 
 	rootCmd.AddCommand(generateCmd)
 }
