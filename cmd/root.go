@@ -20,6 +20,9 @@ var rootCmd = &cobra.Command{
 		cmd.SetArgs(append([]string{"generate"}, args...))
 		cmd.Execute()
 	},
+	// DisableFlagParsing allows flags to be passed through to the generate command
+	// This enables shorthand flag chaining like: goco -vsy
+	DisableFlagParsing: true,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
