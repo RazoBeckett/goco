@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/charmbracelet/bubbles/spinner"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/razobeckett/goco/providers"
 	"github.com/spf13/cobra"
@@ -29,6 +31,67 @@ var (
 				MarginBottom(1)
 )
 
+// modelsSpinnerModel is used to show a loading spinner while fetching models
+type modelsSpinnerModel struct {
+	spinner  spinner.Model
+	message  string
+	done     bool
+	models   []string
+	err      error
+	provider string
+}
+
+func (m modelsSpinnerModel) Init() tea.Cmd {
+	return m.spinner.Tick
+}
+
+func (m modelsSpinnerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+	case spinner.TickMsg:
+		var cmd tea.Cmd
+		m.spinner, cmd = m.spinner.Update(msg)
+		return m, cmd
+	case modelsLoadedMsg:
+		m.models = msg.models
+		m.done = true
+		return m, tea.Quit
+	case errorMsg:
+		m.err = msg.err
+		m.done = true
+		return m, tea.Quit
+	}
+	return m, nil
+}
+
+func (m modelsSpinnerModel) View() string {
+	if m.done {
+		return ""
+	}
+	return fmt.Sprintf("%s %s", m.spinner.View(), m.message)
+}
+
+type modelsLoadedMsg struct {
+	models []string
+}
+
+type errorMsg struct {
+	err error
+}
+
+func newModelsSpinnerModel(message string) modelsSpinnerModel {
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#10B981"))
+	return modelsSpinnerModel{
+		spinner: s,
+		message: message,
+	}
+}
+
 var modelsCmd = &cobra.Command{
 	Use:   "models",
 	Short: "List available AI models",
@@ -50,9 +113,25 @@ var modelsCmd = &cobra.Command{
 		switch modelListProvider {
 		case "groq":
 			providerDisplayName = "Groq"
-			// For Groq, we don't need an API key to list models since they're hardcoded.
-			// Use the static model list to avoid constructing a client when only listing.
-			// models will be filled below when aiProvider is nil.
+			// Get Groq API key
+			apiKey := GetConfig().GetGroqApiKey()
+			if apiKey == "" {
+				envVar := GetConfig().General.ApiKeyGroqEnvVariable
+				if envVar == "" {
+					envVar = "GOCO_GROQ_KEY"
+				}
+
+				promptedKey, err := promptForApiKey(envVar, "Groq")
+				if err != nil {
+					log.Fatalf("Failed to get API key: %v", err)
+				}
+				apiKey = promptedKey
+			}
+
+			aiProvider, err = providers.NewGroqProvider(ctx, apiKey, "llama-3.3-70b-versatile")
+			if err != nil {
+				log.Fatalf("Failed to create Groq provider: %v", err)
+			}
 
 		case "gemini":
 			providerDisplayName = "Gemini"
@@ -80,22 +159,38 @@ var modelsCmd = &cobra.Command{
 			log.Fatalf("Unsupported provider: %s (supported: gemini, groq)", modelListProvider)
 		}
 
-		// Get available models
+		// Show spinner while fetching models
+		spinnerProgram := tea.NewProgram(newModelsSpinnerModel(fmt.Sprintf("Fetching %s models...", providerDisplayName)))
+
+		// Fetch models in goroutine
 		var models []string
-		if aiProvider != nil {
-			var err error
-			models, err = aiProvider.ListModels(ctx)
-			if err != nil {
-				log.Fatalf("Failed to list models: %v", err)
+		var fetchErr error
+		done := make(chan struct{})
+
+		go func() {
+			models, fetchErr = aiProvider.ListModels(ctx)
+			if fetchErr != nil {
+				spinnerProgram.Send(errorMsg{err: fetchErr})
+			} else {
+				spinnerProgram.Send(modelsLoadedMsg{models: models})
 			}
-		} else {
-			// For providers that don't require a client to list models (e.g. Groq),
-			// call the exported static helper.
-			models = providers.GroqStaticModels()
+			close(done)
+		}()
+
+		// Run spinner
+		if _, err := spinnerProgram.Run(); err != nil {
+			log.Fatalf("Failed to run spinner: %v", err)
+		}
+
+		// Wait for fetch to complete
+		<-done
+
+		if fetchErr != nil {
+			log.Fatalf("Failed to list models: %v", fetchErr)
 		}
 
 		// Display models
-		fmt.Println(modelProviderStyle.Render(fmt.Sprintf("📋 Available %s Models", providerDisplayName)))
+		fmt.Println(modelProviderStyle.Render(fmt.Sprintf("📋 Available %s Models (%d found)", providerDisplayName, len(models))))
 		fmt.Println()
 
 		for _, m := range models {

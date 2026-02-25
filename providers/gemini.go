@@ -10,47 +10,6 @@ import (
 	"google.golang.org/genai"
 )
 
-// Available Gemini models from models.dev (https://models.dev/api.json)
-// As of Feb 2026, the following models are available for text generation:
-//
-// Latest models (2025 releases):
-//   - gemini-3-flash-preview (2025-12-17) - Flash preview model
-//   - gemini-3-pro-preview (2025-11-18) - Pro preview model
-//   - gemini-2.5-flash (2025-03-20) - Flash model
-//   - gemini-2.5-pro (2025-03-20) - Pro model
-//   - gemini-flash-latest (2025-09-25) - Latest flash model
-//   - gemini-flash-lite-latest (2025-09-25) - Latest flash lite model
-//
-// Flash series (lightweight, fast):
-//   - gemini-2.0-flash-lite (2024-12-11) - Flash lite
-//   - gemini-2.0-flash (2024-12-11) - Flash
-//   - gemini-1.5-flash (2024-05-14) - Flash
-//   - gemini-1.5-flash-8b (2024-10-03) - Flash 8B
-//
-// Pro series (more capable):
-//   - gemini-1.5-pro (2024-02-15) - Pro
-//
-// Preview models:
-//   - gemini-2.5-flash-preview-05-20 (2025-05-20)
-//   - gemini-2.5-flash-preview-09-2025 (2025-09-25)
-//   - gemini-2.5-flash-preview-04-17 (2025-04-17)
-//   - gemini-2.5-pro-preview-05-06 (2025-05-06)
-//   - gemini-2.5-pro-preview-06-05 (2025-06-05)
-//   - gemini-2.5-flash-lite-preview-06-17 (2025-06-17)
-//   - gemini-2.5-flash-lite-preview-09-2025 (2025-09-25)
-//
-// Specialized models:
-//   - gemini-2.5-flash-image (2025-08-26) - Flash with image capabilities
-//   - gemini-2.5-flash-image-preview (2025-08-26) - Flash image preview
-//   - gemini-live-2.5-flash-preview-native-audio (2025-06-17) - Live with native audio
-//   - gemini-live-2.5-flash (2025-09-01) - Live
-//
-// All models support text generation with context windows up to 1M tokens.
-// Use gemini-2.5-flash or gemini-2.5-pro for best balance of speed and quality.
-//
-// Note: This list is for reference. The actual model list is fetched dynamically
-// from the Google Gemini API at runtime via ListModels().
-
 // GeminiProvider implements the Provider interface for Google Gemini
 type GeminiProvider struct {
 	client *genai.Client
@@ -112,24 +71,29 @@ func (g *GeminiProvider) GenerateCommitMessage(ctx context.Context, gitStatus, g
 	return resp.Text(), nil
 }
 
-// ListModels lists available Gemini models
+// ListModels lists available Gemini models by fetching from the Google API.
+// This returns all models that start with "gemini-" and fallbacks to all
+// models if no gemini models are found. This allows users to select from
+// any available model, not just a hardcoded subset.
 func (g *GeminiProvider) ListModels(ctx context.Context) ([]string, error) {
-	models, err := geminiListModelsFunc(g, ctx)
+	page, err := geminiListModelsFunc(g, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list models: %w", err)
 	}
 
 	var filtered []string
 	re := regexp.MustCompile(`^gemini-`)
-	for _, m := range models {
+
+	for _, m := range page.Items {
 		name := strings.TrimPrefix(m.Name, "models/")
 		if re.MatchString(name) {
 			filtered = append(filtered, name)
 		}
 	}
 
+	// Fallback: if no gemini models found, return all models
 	if len(filtered) == 0 {
-		for _, m := range models {
+		for _, m := range page.Items {
 			name := strings.TrimPrefix(m.Name, "models/")
 			filtered = append(filtered, name)
 		}
@@ -138,15 +102,14 @@ func (g *GeminiProvider) ListModels(ctx context.Context) ([]string, error) {
 	return filtered, nil
 }
 
-var geminiListModelsFunc = func(g *GeminiProvider, ctx context.Context) ([]*genai.Model, error) {
-	models, err := g.client.Models.List(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	return models.Items, nil
+// geminiListModelsFunc is a package-level indirection for ListModels to allow
+// testing without making actual API calls.
+var geminiListModelsFunc = func(g *GeminiProvider, ctx context.Context) (genai.Page[genai.Model], error) {
+	return g.client.Models.List(ctx, nil)
 }
 
-// ValidateModel validates that a model is available
+// ValidateModel validates that a model is available by checking against the API.
+// This allows users to use any model that Google supports.
 func (g *GeminiProvider) ValidateModel(ctx context.Context, model string) error {
 	models, err := g.ListModels(ctx)
 	if err != nil {

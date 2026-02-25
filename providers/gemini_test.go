@@ -12,15 +12,17 @@ func TestListModels_Gemini25FlashIncluded(t *testing.T) {
 	original := geminiListModelsFunc
 	defer func() { geminiListModelsFunc = original }()
 
-	geminiListModelsFunc = func(g *GeminiProvider, ctx context.Context) ([]*genai.Model, error) {
-		return []*genai.Model{
-			{Name: "models/gemini-1.5-flash"},
-			{Name: "models/gemini-2.5-flash"},
-			{Name: "models/gemini-2.5-flash-raw"},
-			{Name: "models/gemini-1.5-pro"},
-			{Name: "models/gemini-flash"},
-			{Name: "models/gemini-pro"},
-			{Name: "models/some-other-model"},
+	geminiListModelsFunc = func(g *GeminiProvider, ctx context.Context) (genai.Page[genai.Model], error) {
+		return genai.Page[genai.Model]{
+			Items: []*genai.Model{
+				{Name: "models/gemini-1.5-flash"},
+				{Name: "models/gemini-2.5-flash"},
+				{Name: "models/gemini-2.5-flash-raw"},
+				{Name: "models/gemini-1.5-pro"},
+				{Name: "models/gemini-flash"},
+				{Name: "models/gemini-pro"},
+				{Name: "models/some-other-model"},
+			},
 		}, nil
 	}
 
@@ -49,10 +51,12 @@ func TestListModels_FallbackWhenEmpty(t *testing.T) {
 	original := geminiListModelsFunc
 	defer func() { geminiListModelsFunc = original }()
 
-	geminiListModelsFunc = func(g *GeminiProvider, ctx context.Context) ([]*genai.Model, error) {
-		return []*genai.Model{
-			{Name: "models/custom-model-1"},
-			{Name: "models/custom-model-2"},
+	geminiListModelsFunc = func(g *GeminiProvider, ctx context.Context) (genai.Page[genai.Model], error) {
+		return genai.Page[genai.Model]{
+			Items: []*genai.Model{
+				{Name: "models/custom-model-1"},
+				{Name: "models/custom-model-2"},
+			},
 		}, nil
 	}
 
