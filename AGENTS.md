@@ -22,9 +22,18 @@ Users should expect things to behave well by default. Less config is best.
 We want to make things convenient, but we don't want to be insecure. Be thoughtful about how things are implemented.
 
 ## Project Overview
-CLI AI assistant (GoCo - Go Conventional) that generates Conventional Commit messages using Google Gemini AI. Built with Cobra for CLI framework and Charm Bracelet libraries for CLI components.
+GoCo is a Fang-based CLI that generates and applies Conventional Commit messages from git changes using Gemini or Groq. The command surface follows Fang conventions for help, errors, `--version`, shell completions, and manpage generation, while command logic is split into focused internal packages for CLI wiring, provider integrations, git operations, and config loading.
 
 ## Code Style
-- **Go version**: 1.24.6+
+- **Go version**: 1.25.5+
+- Prefer Fang/Cobra command constructors with explicit dependencies over package-level mutable globals.
+- Keep business logic out of command bootstrap files; `internal/cli` should orchestrate, while `internal/git`, `internal/ai`, and `internal/config` own their domains.
+- Return errors up to Fang instead of calling `log.Fatal` or `os.Exit` from internal packages.
+- Preserve fast-feeling CLI behavior: avoid unnecessary subprocesses, keep prompts purposeful, and default to single-pass flows.
 
 ## Project Structure
+- `main.go`: Fang entrypoint that executes the root Cobra command with Fang-provided UX.
+- `internal/cli/`: Root command, subcommands, flag binding, prompts, spinners, and styled command output.
+- `internal/ai/`: Gemini and Groq provider implementations, provider factory, and prompt construction.
+- `internal/git/`: Git repository helpers for status, diff, staging, branch creation, and commit execution.
+- `internal/config/`: XDG-aware config loading and provider/env-var defaults.

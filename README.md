@@ -1,15 +1,15 @@
 # GoCo <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Microsoft-Teams-Animated-Emojis/master/Emojis/Travel%20and%20places/Rocket.png" alt="Rocket" width="25" height="25" />
 
-**Go Conventional** - AI-powered conventional commit message generator with a beautiful Terminal User Interface.
+**Go Conventional** - AI-powered conventional commit message generator with a Fang-powered terminal interface.
 
-GoCo transforms your git workflow by automatically generating meaningful conventional commit messages using AI providers (Google Gemini or Groq), all wrapped in a gorgeous TUI built with Charm Bracelet libraries.
+GoCo transforms your git workflow by automatically generating meaningful conventional commit messages using AI providers (Google Gemini or Groq), with Fang handling polished help, errors, shell completions, and manpage generation.
 
 ![GOCO_PREVIEW](demo.gif)
 
 ## Features
 
 - **Multi-Provider AI**: Choose between Google Gemini or Groq (Llama models) for commit message generation
-- **Beautiful TUI**: Modern terminal interface with styled output, loading spinners, and interactive prompts
+- **Fang CLI UX**: Styled help and errors, built-in `--version`, shell completions, and manpage generation
 - **Secure Input**: Password-masked API key prompts when credentials are missing
 - **Smart Config**: TOML-based configuration with XDG Base Directory support and multi-provider support
 - **Verbose Mode**: Optional detailed view of git status and diff in styled boxes
@@ -78,7 +78,7 @@ go install github.com/RazoBeckett/goco@latest
    goco models --provider groq
    ```
 
-That's it! GoCo will analyze your staged changes and generate a beautiful conventional commit message, then automatically commit it.
+That's it! GoCo will analyze your changes, generate a Conventional Commit message, and commit it for you.
 
 ## Usage
 
@@ -92,7 +92,7 @@ goco generate
 goco generate --verbose
 
 # Use short flag for verbose mode
-goco generate -v
+goco generate -V
 
 # Use Groq provider instead of Gemini
 goco generate --provider groq
@@ -107,10 +107,10 @@ goco generate --custom-instructions "make the message concise"
 goco generate --staged
 
 # Chain flags: verbose + staged + skip confirmation
-goco -vsy
+goco generate -Vsy
 
 # Create new branch and commit
-goco -B feature/new-feature
+goco generate -B feature/new-feature
 ```
 
 ### Listing Available Models
@@ -242,8 +242,8 @@ go mod tidy
 
 ## Tech Stack
 
-- **Language**: Go 1.24+
-- **CLI Framework**: [Cobra](https://github.com/spf13/cobra)
+- **Language**: Go 1.25+
+- **CLI Framework**: [Fang](https://github.com/charmbracelet/fang) + [Cobra](https://github.com/spf13/cobra)
 - **TUI Components**: [Charm Bracelet](https://charm.sh/)
   - [Huh](https://github.com/charmbracelet/huh) - Interactive forms
   - [Lipgloss](https://github.com/charmbracelet/lipgloss) - Style definitions
@@ -251,7 +251,7 @@ go mod tidy
 - **AI Providers**: 
   - [Google Gemini API](https://ai.google.dev/)
   - [Groq API](https://console.groq.com/) (Llama models)
-- **Config**: [Viper](https://github.com/spf13/viper) with TOML
+- **Config**: TOML via [BurntSushi/toml](https://github.com/BurntSushi/toml)
 
 ## Conventional Commits
 
