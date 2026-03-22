@@ -12,6 +12,7 @@ func buildPrompt(gitStatus, gitDiff, customInstructions string) string {
 			"Before responding, you MUST:\n"+
 			"- Read: %s\n"+
 			"- ONLY output the commit message and description.\n"+
+			"- There must be commit summary (oneline) at first then empty line and below that newline an commit description.\n"+
 			"- DO NOT include markdown, code blocks, quotes, or any formatting.\n"+
 			"- Output MUST be plain text only.\n"+
 			"- Do not add extra explanations, notes, or commentary.\n"+
