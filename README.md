@@ -245,9 +245,9 @@ go mod tidy
 - **Language**: Go 1.25+
 - **CLI Framework**: [Fang](https://github.com/charmbracelet/fang) + [Cobra](https://github.com/spf13/cobra)
 - **TUI Components**: [Charm Bracelet](https://charm.sh/)
-  - [Huh](https://github.com/charmbracelet/huh) - Interactive forms
+  - [Bubble Tea](https://github.com/charmbracelet/bubbletea) - Interactive prompt runtime
+  - [Bubbles](https://github.com/charmbracelet/bubbles) - Prompt and spinner components
   - [Lipgloss](https://github.com/charmbracelet/lipgloss) - Style definitions
-  - [Bubbles](https://github.com/charmbracelet/bubbles) - TUI components
 - **AI Providers**: 
   - [Google Gemini API](https://ai.google.dev/)
   - [Groq API](https://console.groq.com/) (Llama models)

@@ -22,7 +22,7 @@ func FangColorScheme(ld lipglossv2.LightDarkFunc) fang.ColorScheme {
 		Base:           ld(lipglossv2.Color(electricOrange), lipglossv2.Color(creamGleam)),
 		Title:          lipglossv2.Color(electricOrange),
 		Description:    ld(lipglossv2.Color(tangerineShock), lipglossv2.Color(creamGleam)),
-		Codeblock:      ld(lipglossv2.Color(deepMocha), lipglossv2.Color(deepMocha)),
+		Codeblock:      nil,
 		Program:        ld(lipglossv2.Color(electricOrange), lipglossv2.Color(creamGleam)),
 		DimmedArgument: ld(lipglossv2.Color(sunburstSurge), lipglossv2.Color(mangoVolt)),
 		Comment:        ld(lipglossv2.Color(tangerineShock), lipglossv2.Color(mangoVolt)),

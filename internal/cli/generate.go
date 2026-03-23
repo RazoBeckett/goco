@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/huh"
 	"github.com/razobeckett/goco/internal/ai"
 	"github.com/razobeckett/goco/internal/git"
 	"github.com/spf13/cobra"
@@ -235,27 +234,9 @@ func generateCommitMessage(ctx context.Context, provider ai.Provider, status, di
 }
 
 func promptForAPIKey(envVar, providerName string) (string, error) {
-	var apiKey string
-
 	fmt.Println(titleStyle.Render(fmt.Sprintf("%s API Key Required", providerName)))
-
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewInput().
-				Title(fmt.Sprintf("Enter your %s API key", providerName)).
-				Description(fmt.Sprintf("This sets %s for the current session only.", envVar)).
-				Value(&apiKey).
-				EchoMode(huh.EchoModePassword).
-				Validate(func(s string) error {
-					if strings.TrimSpace(s) == "" {
-						return fmt.Errorf("API key cannot be empty")
-					}
-					return nil
-				}),
-		),
-	)
-
-	if err := form.Run(); err != nil {
+	apiKey, err := runAPIKeyPrompt(providerName, envVar)
+	if err != nil {
 		return "", fmt.Errorf("read API key: %w", err)
 	}
 
@@ -268,23 +249,7 @@ func promptForAPIKey(envVar, providerName string) (string, error) {
 }
 
 func confirmCommit() (bool, error) {
-	var confirmed bool
-
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewConfirm().
-				Title("Proceed with this commit?").
-				Value(&confirmed).
-				Affirmative("Yes").
-				Negative("No"),
-		),
-	)
-
-	if err := form.Run(); err != nil {
-		return false, fmt.Errorf("confirm commit: %w", err)
-	}
-
-	return confirmed, nil
+	return runConfirmPrompt("Proceed with this commit?")
 }
 
 func providerDisplayName(provider string) string {

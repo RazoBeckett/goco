@@ -29,7 +29,6 @@ var (
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color(electricOrange)).
 			Foreground(lipgloss.Color(tangerineShock)).
-			Background(lipgloss.Color(deepMocha)).
 			Padding(1).
 			MarginBottom(1).
 			Width(80)
@@ -38,7 +37,6 @@ var (
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color(tangerineShock)).
 			Foreground(lipgloss.Color(electricOrange)).
-			Background(lipgloss.Color(deepMocha)).
 			Padding(1).
 			MarginBottom(1).
 			Width(80)
@@ -53,7 +51,6 @@ var (
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(lipgloss.Color(mangoVolt)).
 				Foreground(lipgloss.Color(electricOrange)).
-				Background(lipgloss.Color(deepMocha)).
 				Padding(1).
 				MarginBottom(1).
 				Width(80)
