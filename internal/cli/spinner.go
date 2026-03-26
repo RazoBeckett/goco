@@ -29,7 +29,7 @@ type spinnerModel struct {
 func newSpinnerModel(message string) spinnerModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#10B981"))
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(electricOrange))
 
 	return spinnerModel{
 		spinner: s,

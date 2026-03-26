@@ -19,6 +19,7 @@ func main() {
 		cli.NewRootCmd(),
 		fang.WithVersion(version),
 		fang.WithCommit(commit),
+		fang.WithColorSchemeFunc(cli.FangColorScheme),
 		fang.WithNotifySignal(os.Interrupt),
 	); err != nil {
 		os.Exit(1)
