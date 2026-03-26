@@ -1,4 +1,4 @@
-package providers
+package ai
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"google.golang.org/genai"
 )
 
-func TestListModels_Gemini25FlashIncluded(t *testing.T) {
+func TestListModelsGemini25FlashIncluded(t *testing.T) {
 	original := geminiListModelsFunc
 	defer func() { geminiListModelsFunc = original }()
 
@@ -28,7 +28,6 @@ func TestListModels_Gemini25FlashIncluded(t *testing.T) {
 
 	provider := &GeminiProvider{}
 	result, err := provider.ListModels(context.Background())
-
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -43,11 +42,11 @@ func TestListModels_Gemini25FlashIncluded(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(result, expected) {
-		t.Errorf("Expected %v, got %v", expected, result)
+		t.Fatalf("expected %v, got %v", expected, result)
 	}
 }
 
-func TestListModels_FallbackWhenEmpty(t *testing.T) {
+func TestListModelsFallbackWhenEmpty(t *testing.T) {
 	original := geminiListModelsFunc
 	defer func() { geminiListModelsFunc = original }()
 
@@ -62,17 +61,12 @@ func TestListModels_FallbackWhenEmpty(t *testing.T) {
 
 	provider := &GeminiProvider{}
 	result, err := provider.ListModels(context.Background())
-
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	expected := []string{
-		"custom-model-1",
-		"custom-model-2",
-	}
-
+	expected := []string{"custom-model-1", "custom-model-2"}
 	if !reflect.DeepEqual(result, expected) {
-		t.Errorf("Expected %v (fallback), got %v (no fallback)", expected, result)
+		t.Fatalf("expected %v, got %v", expected, result)
 	}
 }
