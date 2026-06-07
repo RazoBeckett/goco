@@ -1,6 +1,33 @@
 package cli
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"os"
+	"strconv"
+
+	"github.com/charmbracelet/lipgloss"
+)
+
+func terminalWidth() int {
+	if s := os.Getenv("COLUMNS"); s != "" {
+		if w, err := strconv.Atoi(s); err == nil && w > 0 {
+			if w > 120 {
+				return 120
+			}
+			return w
+		}
+	}
+	return 80
+}
+
+func boxStyle(borderColor, textColor string) lipgloss.Style {
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(borderColor)).
+		Foreground(lipgloss.Color(textColor)).
+		Padding(1).
+		MarginBottom(1).
+		Width(terminalWidth())
+}
 
 var (
 	titleStyle = lipgloss.NewStyle().
@@ -25,21 +52,8 @@ var (
 			Background(lipgloss.Color(tangerineShock)).
 			Padding(0, 1)
 
-	statusBoxStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color(electricOrange)).
-			Foreground(lipgloss.Color(tangerineShock)).
-			Padding(1).
-			MarginBottom(1).
-			Width(80)
-
-	diffBoxStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color(tangerineShock)).
-			Foreground(lipgloss.Color(electricOrange)).
-			Padding(1).
-			MarginBottom(1).
-			Width(80)
+	statusBoxStyle = boxStyle(electricOrange, tangerineShock)
+	diffBoxStyle   = boxStyle(tangerineShock, electricOrange)
 
 	commitMessageHeaderStyle = lipgloss.NewStyle().
 					Foreground(lipgloss.Color(creamGleam)).
@@ -47,13 +61,7 @@ var (
 					Background(lipgloss.Color(electricOrange)).
 					Padding(0, 1)
 
-	commitMessageBoxStyle = lipgloss.NewStyle().
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(lipgloss.Color(mangoVolt)).
-				Foreground(lipgloss.Color(electricOrange)).
-				Padding(1).
-				MarginBottom(1).
-				Width(80)
+	commitMessageBoxStyle = boxStyle(mangoVolt, electricOrange)
 
 	modelProviderStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color(electricOrange)).
