@@ -13,7 +13,6 @@ const (
 	sunburstSurge  = "#FF9F40"
 	mangoVolt      = "#FFC266"
 	creamGleam     = "#FFF1E6"
-	deepMocha      = "#392E29"
 	lipstickRed    = "#FD0040"
 )
 
