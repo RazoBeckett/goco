@@ -29,13 +29,13 @@ func (g *GroqProvider) DefaultModel() string {
 	return DefaultGroqModel
 }
 
-func (g *GroqProvider) GenerateCommitMessage(ctx context.Context, gitStatus, gitDiff, customInstructions string) (string, error) {
+func (g *GroqProvider) GenerateCommitMessage(ctx context.Context, gitStatus, gitDiff, customInstructions, recentLog string) (string, error) {
 	resp, err := g.client.CreateChatCompletion(ctx, groq.ChatCompletionRequest{
 		Model: g.model,
 		Messages: []groq.ChatMessage{
 			{
 				Role:    groq.RoleUser,
-				Content: buildPrompt(gitStatus, gitDiff, customInstructions),
+				Content: buildPrompt(gitStatus, gitDiff, customInstructions, recentLog),
 			},
 		},
 	})

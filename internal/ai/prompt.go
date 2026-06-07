@@ -1,6 +1,9 @@
 package ai
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 const conventionalCommitsSpec = `
 Conventional Commits specification:
@@ -33,12 +36,18 @@ Rules:
   - breaking changes MAY include BREAKING CHANGE: footer in the body
 `
 
-func buildPrompt(gitStatus, gitDiff, customInstructions string) string {
+func buildPrompt(gitStatus, gitDiff, customInstructions, recentLog string) string {
+	var recentLogSection string
+	if strings.TrimSpace(recentLog) != "" {
+		recentLogSection = fmt.Sprintf("Recent Commits (for context):\n%s\n\n", recentLog)
+	}
+
 	prompt := fmt.Sprintf(
 		"Generate a Conventional Commit based strictly on the following:\n\n"+
 			"Git Status:\n%s\n\n"+
 			"Git Diff:\n%s\n\n"+
-			"%s\n"+
+			"%s"+
+			"%s"+
 			"Before responding, you MUST:\n"+
 			"- ONLY output the commit message and description.\n"+
 			"- There must be a commit summary (one line) at the top, then an empty line, then the commit description below.\n"+
@@ -50,6 +59,7 @@ func buildPrompt(gitStatus, gitDiff, customInstructions string) string {
 			"- No extra lines before or after the commit message.\n",
 		gitStatus,
 		gitDiff,
+		recentLogSection,
 		conventionalCommitsSpec,
 	)
 

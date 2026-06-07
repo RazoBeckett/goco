@@ -32,6 +32,7 @@ type Pipeline struct {
 	modelName string
 	status    string
 	diff      string
+	recentLog string
 	commitMsg string
 
 	// Retry policy for transient AI failures
@@ -153,6 +154,11 @@ func (p *Pipeline) inspect(ctx context.Context) error {
 	p.status = status
 	p.diff = diff
 
+	// Fetch recent commit history for contextual message generation.
+	if log, err := p.deps.repo.RecentLog(ctx, 3); err == nil {
+		p.recentLog = log
+	}
+
 	if p.opts.verbose {
 		fmt.Println(statusHeaderStyle.Render("Git Status"))
 		fmt.Println(statusBoxStyle.Render(status))
@@ -180,7 +186,7 @@ func (p *Pipeline) generate(ctx context.Context) error {
 		}
 
 		msg, err := p.spin(ctx, "Generating commit message...", func(ctx context.Context) (string, error) {
-			return p.provider.GenerateCommitMessage(ctx, p.status, p.diff, p.opts.customInstructions)
+			return p.provider.GenerateCommitMessage(ctx, p.status, p.diff, p.opts.customInstructions, p.recentLog)
 		})
 		if err == nil {
 			if strings.TrimSpace(msg) == "" {

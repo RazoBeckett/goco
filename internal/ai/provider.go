@@ -18,7 +18,7 @@ const (
 type Provider interface {
 	Name() string
 	DefaultModel() string
-	GenerateCommitMessage(ctx context.Context, gitStatus, gitDiff, customInstructions string) (string, error)
+	GenerateCommitMessage(ctx context.Context, gitStatus, gitDiff, customInstructions, recentLog string) (string, error)
 	ListModels(ctx context.Context) ([]string, error)
 	ValidateModel(ctx context.Context, model string) error
 }
