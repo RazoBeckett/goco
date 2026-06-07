@@ -1,14 +1,10 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"os"
-	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/razobeckett/goco/internal/ai"
-	"github.com/razobeckett/goco/internal/git"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -23,8 +19,6 @@ type generateOptions struct {
 	verbose            bool
 	edit               bool
 	noConfirm          bool
-	commitType         string
-	breakingChange     bool
 }
 
 func newGenerateOptions() *generateOptions {
@@ -45,11 +39,11 @@ func newGenerateCmd(deps dependencies) *cobra.Command {
 		},
 	}
 
-	bindGenerateFlags(cmd.Flags(), opts, true)
+	bindGenerateFlags(cmd.Flags(), opts)
 	return cmd
 }
 
-func bindGenerateFlags(fs *pflag.FlagSet, opts *generateOptions, includeDeprecated bool) {
+func bindGenerateFlags(fs *pflag.FlagSet, opts *generateOptions) {
 	fs.StringVarP(&opts.provider, "provider", "p", "", "AI provider to use (gemini or groq)")
 	fs.StringVarP(&opts.apiKey, "api-key", "k", "", "API key for the selected provider")
 	fs.StringVarP(&opts.model, "model", "m", "", "Model to use (defaults to the provider's recommended model)")
@@ -59,178 +53,11 @@ func bindGenerateFlags(fs *pflag.FlagSet, opts *generateOptions, includeDeprecat
 	fs.StringVarP(&opts.customInstructions, "custom-instructions", "c", "", "Additional instructions to add to the AI prompt")
 	fs.BoolVarP(&opts.edit, "edit", "e", false, "Open the generated commit message in your editor before committing")
 	fs.StringVarP(&opts.newBranch, "branch", "B", "", "Create a new branch from the current branch before committing")
-
-	if includeDeprecated {
-		fs.StringVarP(&opts.commitType, "type", "t", "", "Deprecated")
-		_ = fs.MarkDeprecated("type", "flag is unused and will be removed")
-
-		fs.BoolVarP(&opts.breakingChange, "breaking-change", "b", false, "Deprecated")
-		_ = fs.MarkDeprecated("breaking-change", "flag is unused and will be removed")
-	}
 }
 
 func runGenerate(cmd *cobra.Command, deps dependencies, opts *generateOptions) error {
-	ctx := cmd.Context()
-
-	cfg, err := deps.configLoader.Load()
-	if err != nil {
-		return fmt.Errorf("load config %q: %w", deps.configLoader.Path(), err)
-	}
-
-	providerName := opts.provider
-	if providerName == "" {
-		providerName = cfg.DefaultProviderName()
-	}
-	if providerName != ai.ProviderGemini && providerName != ai.ProviderGroq {
-		return fmt.Errorf("invalid provider %q; supported providers: gemini, groq", providerName)
-	}
-
-	apiKey := opts.apiKey
-	if apiKey == "" {
-		apiKey = cfg.APIKey(providerName)
-	}
-	if apiKey == "" {
-		apiKey, err = promptForAPIKey(cfg.APIKeyEnv(providerName), providerDisplayName(providerName))
-		if err != nil {
-			return err
-		}
-	}
-
-	provider, err := ai.NewProvider(ctx, providerName, apiKey, opts.model)
-	if err != nil {
-		return err
-	}
-
-	modelName := opts.model
-	if modelName == "" {
-		modelName = provider.DefaultModel()
-	}
-	if err := provider.ValidateModel(ctx, modelName); err != nil {
-		return fmt.Errorf("validate model %q: %w", modelName, err)
-	}
-
-	status, err := deps.repo.EnsureChanges(ctx)
-	if err != nil {
-		if err == git.ErrNoChanges {
-			return fmt.Errorf("no changes detected; stage files or edit your working tree before running goco")
-		}
-		return err
-	}
-
-	diff, err := deps.repo.Diff(ctx, opts.staged)
-	if err != nil {
-		return fmt.Errorf("read git diff: %w", err)
-	}
-
-	if opts.verbose {
-		fmt.Println(statusHeaderStyle.Render("Git Status"))
-		fmt.Println(statusBoxStyle.Render(status))
-		fmt.Println(diffHeaderStyle.Render("Git Diff"))
-		fmt.Println(diffBoxStyle.Render(diff))
-	}
-
-	commitMessage, err := generateCommitMessage(ctx, provider, status, diff, opts.customInstructions)
-	if err != nil {
-		return err
-	}
-
-	fmt.Println(commitMessageHeaderStyle.Render("Generated Commit Message"))
-	fmt.Println(commitMessageBoxStyle.Render(commitMessage))
-
-	if opts.edit {
-		fmt.Println(titleStyle.Render("Edit Commit Message"))
-
-		commitMessage, err = editCommitMessage(commitMessage)
-		if err != nil {
-			return err
-		}
-
-		fmt.Println(commitMessageHeaderStyle.Render("Final Commit Message"))
-		fmt.Println(commitMessageBoxStyle.Render(commitMessage))
-	}
-
-	if opts.newBranch != "" {
-		currentBranch, err := deps.repo.CurrentBranch(ctx)
-		if err != nil {
-			return err
-		}
-
-		if err := deps.repo.CreateBranch(ctx, opts.newBranch); err != nil {
-			return err
-		}
-
-		if opts.verbose {
-			fmt.Printf("\nCreated and switched to %q from %q.\n\n", opts.newBranch, currentBranch)
-		}
-	}
-
-	if !opts.noConfirm {
-		confirmed, err := confirmCommit()
-		if err != nil {
-			return err
-		}
-		if !confirmed {
-			fmt.Println(noteStyle.Render("Commit cancelled."))
-			return nil
-		}
-	}
-
-	var stagedFiles []string
-	if opts.staged {
-		stagedFiles, err = deps.repo.StagedFiles(ctx)
-		if err != nil {
-			if err == git.ErrNoChanges {
-				return fmt.Errorf("no staged changes to commit")
-			}
-			return err
-		}
-	} else {
-		if err := deps.repo.StageTracked(ctx); err != nil {
-			return err
-		}
-	}
-
-	if err := deps.repo.Commit(ctx, commitMessage, stagedFiles); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func generateCommitMessage(ctx context.Context, provider ai.Provider, status, diff, customInstructions string) (string, error) {
-	program := tea.NewProgram(newSpinnerModel("Generating commit message..."))
-	resultCh := make(chan struct {
-		message string
-		err     error
-	}, 1)
-
-	go func() {
-		message, err := provider.GenerateCommitMessage(ctx, status, diff, customInstructions)
-		resultCh <- struct {
-			message string
-			err     error
-		}{message: message, err: err}
-
-		if err != nil {
-			program.Send(spinnerErrorMsg{err: err})
-			return
-		}
-		program.Send(spinnerDoneMsg{})
-	}()
-
-	if _, err := program.Run(); err != nil {
-		return "", fmt.Errorf("run spinner: %w", err)
-	}
-
-	result := <-resultCh
-	if result.err != nil {
-		return "", fmt.Errorf("generate commit message: %w", result.err)
-	}
-	if strings.TrimSpace(result.message) == "" {
-		return "", fmt.Errorf("AI provider returned an empty commit message")
-	}
-
-	return strings.TrimSpace(result.message), nil
+	pipeline := NewPipeline(deps, opts)
+	return pipeline.Run(cmd.Context())
 }
 
 func promptForAPIKey(envVar, providerName string) (string, error) {
@@ -240,9 +67,15 @@ func promptForAPIKey(envVar, providerName string) (string, error) {
 		return "", fmt.Errorf("read API key: %w", err)
 	}
 
-	_ = os.Setenv(envVar, apiKey)
+	// Best-effort: make the key available to child processes this session.
+	if setErr := os.Setenv(envVar, apiKey); setErr != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not set %s: %v\n", envVar, setErr)
+	}
 
-	fmt.Println(noteStyle.Render(fmt.Sprintf("Set %s for this session. Add it to your shell profile to avoid the prompt next time.", envVar)))
+	fmt.Println(noteStyle.Render(fmt.Sprintf(
+		"Set %s for this session. Add it to your shell profile to avoid the prompt next time.",
+		envVar,
+	)))
 	fmt.Println()
 
 	return apiKey, nil
