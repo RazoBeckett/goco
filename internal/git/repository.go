@@ -78,6 +78,11 @@ func (r *Repository) StagedFiles(ctx context.Context) ([]string, error) {
 	return files, nil
 }
 
+func (r *Repository) RecentLog(ctx context.Context, count int) (string, error) {
+	return r.output(ctx, "log", fmt.Sprintf("--max-count=%d", count),
+		"--pretty=format:%ad%n%s%n%b", "--date=iso")
+}
+
 func (r *Repository) Commit(ctx context.Context, message string, onlyFiles []string) error {
 	args := []string{"commit", "-m", message}
 	if len(onlyFiles) > 0 {

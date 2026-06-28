@@ -38,11 +38,11 @@ func (g *GeminiProvider) DefaultModel() string {
 	return DefaultGeminiModel
 }
 
-func (g *GeminiProvider) GenerateCommitMessage(ctx context.Context, gitStatus, gitDiff, customInstructions string) (string, error) {
+func (g *GeminiProvider) GenerateCommitMessage(ctx context.Context, gitStatus, gitDiff, customInstructions, recentLog string) (string, error) {
 	resp, err := g.client.Models.GenerateContent(
 		ctx,
 		g.model,
-		genai.Text(buildPrompt(gitStatus, gitDiff, customInstructions)),
+		genai.Text(buildPrompt(gitStatus, gitDiff, customInstructions, recentLog)),
 		nil,
 	)
 	if err != nil {

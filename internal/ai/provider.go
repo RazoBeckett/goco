@@ -3,6 +3,8 @@ package ai
 import (
 	"context"
 	"fmt"
+	"net"
+	"strings"
 )
 
 const (
@@ -16,7 +18,7 @@ const (
 type Provider interface {
 	Name() string
 	DefaultModel() string
-	GenerateCommitMessage(ctx context.Context, gitStatus, gitDiff, customInstructions string) (string, error)
+	GenerateCommitMessage(ctx context.Context, gitStatus, gitDiff, customInstructions, recentLog string) (string, error)
 	ListModels(ctx context.Context) ([]string, error)
 	ValidateModel(ctx context.Context, model string) error
 }
@@ -37,4 +39,31 @@ func withDefault(value, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func IsTransient(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	transient := []string{
+		"rate limit",
+		"too many requests",
+		"internal server error",
+		"service unavailable",
+		"timeout",
+		"temporary",
+		"connection reset",
+		"broken pipe",
+	}
+	lower := strings.ToLower(msg)
+	for _, keyword := range transient {
+		if strings.Contains(lower, keyword) {
+			return true
+		}
+	}
+	if netErr, ok := err.(net.Error); ok && (netErr.Timeout() || netErr.Temporary()) {
+		return true
+	}
+	return false
 }

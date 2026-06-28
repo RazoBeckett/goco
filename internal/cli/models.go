@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/razobeckett/goco/internal/ai"
@@ -20,7 +21,7 @@ func newModelsCmd(deps dependencies) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "models",
 		Short:   "List available AI models",
-		Long:    "List all available AI models for the selected provider.",
+		Long:    "List all available AI models for the selected provider. Uses the models.dev community registry by default — no API key required.",
 		GroupID: "inspect",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -29,7 +30,7 @@ func newModelsCmd(deps dependencies) *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&opts.provider, "provider", "p", "", "AI provider to list models for (gemini or groq)")
-	cmd.Flags().StringVarP(&opts.apiKey, "api-key", "k", "", "API key for the selected provider")
+	cmd.Flags().StringVarP(&opts.apiKey, "api-key", "k", "", "API key for the selected provider (only needed if models.dev is unreachable)")
 	return cmd
 }
 
@@ -49,12 +50,22 @@ func runModels(cmd *cobra.Command, deps dependencies, opts *modelsOptions) error
 		return fmt.Errorf("invalid provider %q; supported providers: gemini, groq", providerName)
 	}
 
+	displayName := providerDisplayName(providerName)
+
+	// Stage 1: Try models.dev — fast, cached, no API key needed.
+	models, source := tryModelsDev(ctx, providerName)
+	if len(models) > 0 {
+		displayModels(ctx, models, displayName, source, cmd.Root().Name())
+		return nil
+	}
+
+	// Stage 2: models.dev unreachable — fall back to live API with spinner.
 	apiKey := opts.apiKey
 	if apiKey == "" {
 		apiKey = cfg.APIKey(providerName)
 	}
 	if apiKey == "" {
-		apiKey, err = promptForAPIKey(cfg.APIKeyEnv(providerName), providerDisplayName(providerName))
+		apiKey, err = promptForAPIKey(cfg.APIKeyEnv(providerName), displayName)
 		if err != nil {
 			return err
 		}
@@ -65,20 +76,44 @@ func runModels(cmd *cobra.Command, deps dependencies, opts *modelsOptions) error
 		return err
 	}
 
-	models, err := fetchModelsWithSpinner(ctx, provider)
+	models, err = fetchModelsWithSpinner(ctx, provider)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println(modelProviderStyle.Render(fmt.Sprintf("Available %s Models (%d found)", providerDisplayName(providerName), len(models))))
+	displayModels(ctx, models, displayName, "live API", cmd.Root().Name())
+	return nil
+}
+
+// tryModelsDev attempts to get models from the models.dev registry cache.
+// Returns (models, source_description). On failure, returns empty slice.
+func tryModelsDev(ctx context.Context, providerName string) ([]string, string) {
+	models, err := ai.ListModelsFromDev(providerName)
+	if err != nil || len(models) == 0 {
+		return nil, ""
+	}
+
+	// models.dev returns unsorted; stable-sort for consistent output.
+	sort.Strings(models)
+
+	return models, "models.dev registry"
+}
+
+// displayModels prints the model list with appropriate header and source note.
+func displayModels(ctx context.Context, models []string, providerName, source, commandName string) {
+	fmt.Println(modelProviderStyle.Render(
+		fmt.Sprintf("Available %s Models (%d found)", providerName, len(models)),
+	))
 	fmt.Println()
+
 	for _, model := range models {
 		fmt.Println(modelItemStyle.Render("• " + model))
 	}
-	fmt.Println()
-	fmt.Println(noteStyle.Render(fmt.Sprintf("Use --model with %s generate to pick a specific model.", cmd.Root().Name())))
 
-	return nil
+	fmt.Println()
+	fmt.Println(noteStyle.Render(
+		fmt.Sprintf("Source: %s. Use --model with %s generate to pick a specific model.", source, commandName),
+	))
 }
 
 func fetchModelsWithSpinner(ctx context.Context, provider ai.Provider) ([]string, error) {
