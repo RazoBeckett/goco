@@ -1,71 +1,42 @@
 package ai
 
-import (
-	"fmt"
-	"strings"
-)
+import "strings"
 
-const conventionalCommitsSpec = `
-Conventional Commits specification:
+// systemPrompt carries the Conventional Commits rules. It is stable across
+// calls so providers that cache prompts can reuse it.
+const systemPrompt = `You write Conventional Commit messages from a git diff.
 
-The commit message MUST be structured as:
+Return only the commit message. Do not use markdown, code fences, quotes, or commentary.
+
+Format the subject line as:
   <type>[optional scope]: <description>
-  [blank line]
-  [optional body]
-
-Types MUST be one of:
-  feat     — a new feature
-  fix      — a bug fix
-  docs     — documentation only changes
-  style    — formatting, missing semi-colons, etc; no code change
-  refactor — a code change that neither fixes a bug nor adds a feature
-  perf     — a code change that improves performance
-  test     — adding missing tests or correcting existing tests
-  chore    — changes to the build process or auxiliary tools
-  ci       — changes to CI configuration files and scripts
-  build    — changes that affect the build system or external dependencies
 
 Rules:
-  - type and description are mandatory
-  - scope is optional and MUST be in parentheses after the type
-  - description MUST start with a lowercase letter
-  - description MUST NOT end with a period
-  - subject line (type + scope + description) MUST be <= 72 characters
-  - body is optional, separated from subject by a blank line
-  - breaking changes MUST append ! before the colon, e.g. feat!: drop support
-  - breaking changes MAY include BREAKING CHANGE: footer in the body
-`
+  - type must be one of: feat, fix, docs, style, refactor, perf, test, chore, ci, build
+  - scope is optional and goes in parentheses right after the type
+  - the description starts with a lowercase letter and does not end with a period
+  - the whole subject line is 72 characters or fewer
+  - put a blank line after the subject, then an optional body when the change needs explanation
+  - mark a breaking change with ! before the colon, for example: feat!: drop the v1 API`
 
-func buildPrompt(gitStatus, gitDiff, customInstructions, recentLog string) string {
-	var recentLogSection string
+// buildUserPrompt assembles the change description sent to the model.
+func buildUserPrompt(gitStatus, gitDiff, customInstructions, recentLog string) string {
+	var b strings.Builder
+
+	b.WriteString("Git Status:\n")
+	b.WriteString(gitStatus)
+	b.WriteString("\n\nGit Diff:\n")
+	b.WriteString(gitDiff)
+
 	if strings.TrimSpace(recentLog) != "" {
-		recentLogSection = fmt.Sprintf("Recent Commits (for context):\n%s\n\n", recentLog)
+		b.WriteString("\n\nRecent Commits (for context, do not repeat them):\n")
+		b.WriteString(recentLog)
 	}
-
-	prompt := fmt.Sprintf(
-		"Generate a Conventional Commit based strictly on the following:\n\n"+
-			"Git Status:\n%s\n\n"+
-			"Git Diff:\n%s\n\n"+
-			"%s"+
-			"%s"+
-			"Before responding, you MUST:\n"+
-			"- ONLY output the commit message and description.\n"+
-			"- There must be a commit summary (one line) at the top, then an empty line, then the commit description below.\n"+
-			"- DO NOT include markdown, code blocks, quotes, or any formatting.\n"+
-			"- Output MUST be plain text only.\n"+
-			"- Do not add extra explanations, notes, or commentary.\n"+
-			"- The first line is the commit summary, the rest is the description.\n"+
-			"- Follow the specification above exactly.\n"+
-			"- No extra lines before or after the commit message.\n",
-		gitStatus,
-		gitDiff,
-		recentLogSection,
-		conventionalCommitsSpec,
-	)
 
 	if customInstructions != "" {
-		prompt += fmt.Sprintf("\nAdditional Instructions:\n%s\n", customInstructions)
+		b.WriteString("\n\nAdditional Instructions:\n")
+		b.WriteString(customInstructions)
 	}
 
-	return prompt
+	return b.String()
 }

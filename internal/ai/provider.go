@@ -3,67 +3,53 @@ package ai
 import (
 	"context"
 	"fmt"
-	"net"
 	"strings"
+
+	"github.com/zendev-sh/goai"
+	"github.com/zendev-sh/goai/provider"
 )
 
-const (
-	ProviderGemini = "gemini"
-	ProviderGroq   = "groq"
-
-	DefaultGeminiModel = "gemini-2.5-flash"
-	DefaultGroqModel   = "llama-3.3-70b-versatile"
-)
-
-type Provider interface {
-	Name() string
-	DefaultModel() string
-	GenerateCommitMessage(ctx context.Context, gitStatus, gitDiff, customInstructions, recentLog string) (string, error)
-	ListModels(ctx context.Context) ([]string, error)
-	ValidateModel(ctx context.Context, model string) error
+// Client generates commit messages with one AI provider.
+type Client struct {
+	name string
+	lm   provider.LanguageModel
 }
 
-func NewProvider(ctx context.Context, providerName, apiKey, model string) (Provider, error) {
-	switch providerName {
-	case ProviderGroq:
-		return NewGroqProvider(ctx, apiKey, withDefault(model, DefaultGroqModel))
-	case ProviderGemini:
-		return NewGeminiProvider(ctx, apiKey, withDefault(model, DefaultGeminiModel))
-	default:
-		return nil, fmt.Errorf("unsupported provider %q (supported: gemini, groq)", providerName)
+// New builds a Client for the named provider. The name must come from the
+// registry. An empty model falls back to the provider's default.
+func New(name, model, apiKey string) (*Client, error) {
+	spec, ok := Lookup(name)
+	if !ok {
+		return nil, fmt.Errorf("unsupported provider %q; supported providers: %s", name, SupportedList())
 	}
+
+	if model == "" {
+		model = spec.DefaultModel
+	}
+
+	return &Client{
+		name: name,
+		lm:   factories[name](model, apiKey),
+	}, nil
 }
 
-func withDefault(value, fallback string) string {
-	if value == "" {
-		return fallback
-	}
-	return value
-}
+// Name returns the provider name.
+func (c *Client) Name() string { return c.name }
 
-func IsTransient(err error) bool {
-	if err == nil {
-		return false
+// GenerateCommitMessage asks the provider for a Conventional Commit message.
+// The goai client retries transient API failures with exponential backoff.
+func (c *Client) GenerateCommitMessage(ctx context.Context, gitStatus, gitDiff, customInstructions, recentLog string) (string, error) {
+	result, err := goai.GenerateText(
+		ctx,
+		c.lm,
+		goai.WithSystem(systemPrompt),
+		goai.WithPrompt(buildUserPrompt(gitStatus, gitDiff, customInstructions, recentLog)),
+		goai.WithTemperature(0.2),
+		goai.WithMaxRetries(2),
+	)
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", c.name, err)
 	}
-	msg := err.Error()
-	transient := []string{
-		"rate limit",
-		"too many requests",
-		"internal server error",
-		"service unavailable",
-		"timeout",
-		"temporary",
-		"connection reset",
-		"broken pipe",
-	}
-	lower := strings.ToLower(msg)
-	for _, keyword := range transient {
-		if strings.Contains(lower, keyword) {
-			return true
-		}
-	}
-	if netErr, ok := err.(net.Error); ok && (netErr.Timeout() || netErr.Temporary()) {
-		return true
-	}
-	return false
+
+	return strings.TrimSpace(result.Text), nil
 }

@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 var (
@@ -24,8 +24,6 @@ var (
 				Foreground(lipgloss.Color(lipstickRed))
 )
 
-type apiKeyPromptDoneMsg struct{}
-
 type apiKeyPromptModel struct {
 	input       textinput.Model
 	title       string
@@ -40,10 +38,14 @@ func newAPIKeyPromptModel(providerName, envVar string) apiKeyPromptModel {
 	input.Placeholder = "Paste API key"
 	input.EchoMode = textinput.EchoPassword
 	input.EchoCharacter = '•'
-	input.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(electricOrange))
-	input.TextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(creamGleam))
-	input.PlaceholderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(mangoVolt))
-	input.Cursor.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(electricOrange))
+
+	styles := textinput.DefaultDarkStyles()
+	styles.Focused.Prompt = lipgloss.NewStyle().Foreground(lipgloss.Color(electricOrange))
+	styles.Focused.Text = lipgloss.NewStyle().Foreground(lipgloss.Color(creamGleam))
+	styles.Focused.Placeholder = lipgloss.NewStyle().Foreground(lipgloss.Color(mangoVolt))
+	styles.Blurred = styles.Focused
+	styles.Cursor.Color = lipgloss.Color(electricOrange)
+	input.SetStyles(styles)
 
 	return apiKeyPromptModel{
 		input:       input,
@@ -57,9 +59,8 @@ func (m apiKeyPromptModel) Init() tea.Cmd {
 }
 
 func (m apiKeyPromptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
+	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
+		switch keyMsg.String() {
 		case "ctrl+c", "esc":
 			return m, tea.Quit
 		case "enter":
@@ -81,7 +82,7 @@ func (m apiKeyPromptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m apiKeyPromptModel) View() string {
+func (m apiKeyPromptModel) View() tea.View {
 	var parts []string
 	parts = append(parts, promptTitleStyle.Render(m.title))
 	parts = append(parts, promptDescriptionStyle.Render(m.description))
@@ -89,7 +90,7 @@ func (m apiKeyPromptModel) View() string {
 	if m.err != nil {
 		parts = append(parts, promptErrorStyle.Render(m.err.Error()))
 	}
-	return strings.Join(parts, "\n")
+	return tea.NewView(strings.Join(parts, "\n"))
 }
 
 func runAPIKeyPrompt(providerName, envVar string) (string, error) {
@@ -151,6 +152,7 @@ func newConfirmPromptModel(title string) confirmPromptModel {
 	}
 
 	h := help.New()
+	h.Styles = help.DefaultDarkStyles()
 	h.Styles.ShortKey = promptDescriptionStyle
 	h.Styles.ShortDesc = promptDescriptionStyle
 	h.Styles.ShortSeparator = promptDescriptionStyle
@@ -167,25 +169,24 @@ func (m confirmPromptModel) Init() tea.Cmd {
 }
 
 func (m confirmPromptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
 		switch {
-		case key.Matches(msg, m.keys.Left):
+		case key.Matches(keyMsg, m.keys.Left):
 			m.selected = 0
-		case key.Matches(msg, m.keys.Right):
+		case key.Matches(keyMsg, m.keys.Right):
 			m.selected = 1
-		case key.Matches(msg, m.keys.Submit):
+		case key.Matches(keyMsg, m.keys.Submit):
 			m.submitted = true
 			return m, tea.Quit
-		case key.Matches(msg, m.keys.Choose):
-			if msg.String() == "y" {
+		case key.Matches(keyMsg, m.keys.Choose):
+			if keyMsg.String() == "y" {
 				m.selected = 0
 			} else {
 				m.selected = 1
 			}
 			m.submitted = true
 			return m, tea.Quit
-		case msg.String() == "ctrl+c" || msg.String() == "esc":
+		case keyMsg.String() == "ctrl+c" || keyMsg.String() == "esc":
 			return m, tea.Quit
 		}
 	}
@@ -193,7 +194,7 @@ func (m confirmPromptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m confirmPromptModel) View() string {
+func (m confirmPromptModel) View() tea.View {
 	selectedStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(creamGleam)).
 		Background(lipgloss.Color(electricOrange)).
@@ -211,11 +212,11 @@ func (m confirmPromptModel) View() string {
 		noStyle = selectedStyle
 	}
 
-	return strings.Join([]string{
+	return tea.NewView(strings.Join([]string{
 		promptTitleStyle.Render(m.title),
 		lipgloss.JoinHorizontal(lipgloss.Left, yesStyle.Render("Yes"), "  ", noStyle.Render("No")),
 		m.help.ShortHelpView(m.keys.ShortHelp()),
-	}, "\n")
+	}, "\n"))
 }
 
 func runConfirmPrompt(title string) (bool, error) {

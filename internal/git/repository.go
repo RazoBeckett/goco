@@ -67,15 +67,18 @@ func (r *Repository) StageTracked(ctx context.Context) error {
 }
 
 func (r *Repository) StagedFiles(ctx context.Context) ([]string, error) {
-	out, err := r.output(ctx, "diff", "--name-only", "--cached")
+	// -z separates names with NUL so paths that contain spaces stay intact.
+	out, err := r.output(ctx, "diff", "--name-only", "--cached", "-z")
 	if err != nil {
 		return nil, fmt.Errorf("list staged files: %w", err)
 	}
-	files := strings.Fields(strings.TrimSpace(out))
-	if len(files) == 0 {
+
+	out = strings.TrimRight(out, "\x00")
+	if out == "" {
 		return nil, ErrNoChanges
 	}
-	return files, nil
+
+	return strings.Split(out, "\x00"), nil
 }
 
 func (r *Repository) RecentLog(ctx context.Context, count int) (string, error) {

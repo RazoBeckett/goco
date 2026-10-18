@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/razobeckett/goco/internal/ai"
 	"github.com/razobeckett/goco/internal/git"
@@ -27,26 +28,19 @@ type Pipeline struct {
 	deps dependencies
 	opts *generateOptions
 
-	// State accumulated across stages
-	provider  ai.Provider
-	modelName string
+	// State accumulated across stages.
+	client    *ai.Client
 	status    string
 	diff      string
 	recentLog string
 	commitMsg string
-
-	// Retry policy for transient AI failures
-	maxRetries int
-	retryDelay time.Duration
 }
 
 // NewPipeline creates a pipeline from the given dependencies and options.
 func NewPipeline(deps dependencies, opts *generateOptions) *Pipeline {
 	return &Pipeline{
-		deps:       deps,
-		opts:       opts,
-		maxRetries: 2,
-		retryDelay: 2 * time.Second,
+		deps: deps,
+		opts: opts,
 	}
 }
 
@@ -80,9 +74,9 @@ func (p *Pipeline) Run(ctx context.Context) error {
 	return nil
 }
 
-// --- Stage 1: Resolve config + provider + model ---
+// --- Stage 1: Resolve config + provider + model + API key ---
 
-func (p *Pipeline) resolve(ctx context.Context) error {
+func (p *Pipeline) resolve(_ context.Context) error {
 	cfg, err := p.deps.configLoader.Load()
 	if err != nil {
 		return fmt.Errorf("load config %q: %w", p.deps.configLoader.Path(), err)
@@ -92,39 +86,47 @@ func (p *Pipeline) resolve(ctx context.Context) error {
 	if providerName == "" {
 		providerName = cfg.DefaultProviderName()
 	}
-	if providerName != ai.ProviderGemini && providerName != ai.ProviderGroq {
-		return fmt.Errorf("invalid provider %q; supported providers: gemini, groq", providerName)
+
+	spec, ok := ai.Lookup(providerName)
+	if !ok {
+		return fmt.Errorf("invalid provider %q; supported providers: %s", providerName, ai.SupportedList())
+	}
+
+	modelName := p.opts.model
+	if modelName == "" {
+		modelName = cfg.Model(providerName)
+	}
+	if modelName == "" {
+		modelName = spec.DefaultModel
 	}
 
 	apiKey := p.opts.apiKey
+	envName := cfg.APIKeyEnv(providerName, spec.KeyEnv)
 	if apiKey == "" {
-		apiKey = cfg.APIKey(providerName)
+		apiKey = os.Getenv(envName)
 	}
 	if apiKey == "" {
-		key, err := promptForAPIKey(cfg.APIKeyEnv(providerName), providerDisplayName(providerName))
+		// Accept GoCo's own GOCO_<PROVIDER>_KEY convention as a fallback.
+		fallbackEnv := "GOCO_" + strings.ToUpper(providerName) + "_KEY"
+		if value := os.Getenv(fallbackEnv); value != "" {
+			apiKey = value
+			envName = fallbackEnv
+		}
+	}
+	if apiKey == "" {
+		key, err := promptForAPIKey(envName, providerDisplayName(providerName))
 		if err != nil {
 			return err
 		}
 		apiKey = key
 	}
 
-	provider, err := ai.NewProvider(ctx, providerName, apiKey, p.opts.model)
+	client, err := ai.New(providerName, modelName, apiKey)
 	if err != nil {
 		return err
 	}
 
-	modelName := p.opts.model
-	if modelName == "" {
-		modelName = provider.DefaultModel()
-	} else if modelName != provider.DefaultModel() {
-		// Only validate non-default models to save an API round-trip.
-		if err := provider.ValidateModel(ctx, modelName); err != nil {
-			return fmt.Errorf("validate model %q: %w", modelName, err)
-		}
-	}
-
-	p.provider = provider
-	p.modelName = modelName
+	p.client = client
 	return nil
 }
 
@@ -169,59 +171,33 @@ func (p *Pipeline) inspect(ctx context.Context) error {
 	return nil
 }
 
-// --- Stage 3: Generate commit message via AI (with retry) ---
+// --- Stage 3: Generate commit message via the provider ---
 
 func (p *Pipeline) generate(ctx context.Context) error {
-	var lastErr error
-
-	for attempt := 0; attempt <= p.maxRetries; attempt++ {
-		if attempt > 0 {
-			delay := p.retryDelay * time.Duration(1<<(attempt-1))
-			fmt.Fprintf(os.Stderr, "\nRetrying in %v (attempt %d/%d)...\n", delay, attempt+1, p.maxRetries+1)
-			select {
-			case <-time.After(delay):
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-		}
-
-		msg, err := p.spin(ctx, "Generating commit message...", func(ctx context.Context) (string, error) {
-			return p.provider.GenerateCommitMessage(ctx, p.status, p.diff, p.opts.customInstructions, p.recentLog)
-		})
-		if err == nil {
-			if strings.TrimSpace(msg) == "" {
-				return fmt.Errorf("AI provider returned an empty commit message")
-			}
-			p.commitMsg = strings.TrimSpace(msg)
-			return nil
-		}
-
-		lastErr = err
-
-		if !ai.IsTransient(err) {
-			return fmt.Errorf("generate commit message: %w", err)
-		}
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
+	msg, err := p.spin(ctx, "Generating commit message...", func(ctx context.Context) (string, error) {
+		return p.client.GenerateCommitMessage(ctx, p.status, p.diff, p.opts.customInstructions, p.recentLog)
+	})
+	if err != nil {
+		return fmt.Errorf("generate commit message: %w", err)
 	}
 
-	return fmt.Errorf("generate commit message after %d retries: %w", p.maxRetries+1, lastErr)
+	if strings.TrimSpace(msg) == "" {
+		return fmt.Errorf("provider %s returned an empty commit message", p.client.Name())
+	}
+
+	p.commitMsg = strings.TrimSpace(msg)
+	return nil
 }
 
 // --- Stage 4: Validate the commit message ---
 
 func (p *Pipeline) validate(_ context.Context) error {
-	lines := strings.Split(p.commitMsg, "\n")
-	if len(lines) == 0 {
-		return fmt.Errorf("commit message is empty")
-	}
+	subject := strings.SplitN(p.commitMsg, "\n", 2)[0]
 
-	subject := lines[0]
-	if len(subject) > 72 {
+	if utf8.RuneCountInString(subject) > 72 {
 		return fmt.Errorf(
 			"commit subject is %d characters (max 72); use --edit to shorten it",
-			len(subject),
+			utf8.RuneCountInString(subject),
 		)
 	}
 
@@ -235,7 +211,7 @@ func (p *Pipeline) validate(_ context.Context) error {
 	return nil
 }
 
-// --- Stage 5: Review — display, optional edit, confirm ---
+// --- Stage 5: Review: display, optional edit, confirm ---
 
 func (p *Pipeline) review(ctx context.Context) error {
 	fmt.Println(commitMessageHeaderStyle.Render("Generated Commit Message"))
@@ -275,7 +251,7 @@ func (p *Pipeline) review(ctx context.Context) error {
 	return nil
 }
 
-// --- Stage 6: Apply — branch, stage, commit ---
+// --- Stage 6: Apply: branch, stage, commit ---
 
 func (p *Pipeline) apply(ctx context.Context) error {
 	if p.opts.newBranch != "" {
