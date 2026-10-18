@@ -10,14 +10,14 @@ version: 2
 
 before:
   hooks:
-    # You may remove this if you don't use go modules.
+    # Keep the module graph tidy before a release build.
     - go mod tidy
-    # you may remove this if you don't need go generate
-    - go generate ./...
 
 builds:
   - env:
       - CGO_ENABLED=0
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}}
     goos:
       - linux
       - windows
