@@ -1,261 +1,175 @@
-# GoCo <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Microsoft-Teams-Animated-Emojis/master/Emojis/Travel%20and%20places/Rocket.png" alt="Rocket" width="25" height="25" />
+# GoCo
 
-**Go Conventional** - AI-powered conventional commit message generator with a Fang-powered terminal interface.
-
-GoCo transforms your git workflow by automatically generating meaningful conventional commit messages using AI providers (Google Gemini or Groq), with Fang handling polished help, errors, shell completions, and manpage generation.
-
-![GOCO_PREVIEW](demo.gif)
+**Go Conventional**: generate Conventional Commit messages from your git changes with an AI provider, then commit them. GoCo uses [Fang](https://charm.land) for polished help, errors, shell completions, and manpages.
 
 ## Features
 
-- **Multi-Provider AI**: Choose between Google Gemini or Groq (Llama models) for commit message generation
-- **Fang CLI UX**: Styled help and errors, built-in `--version`, shell completions, and manpage generation
-- **Secure Input**: Password-masked API key prompts when credentials are missing
-- **Smart Config**: TOML-based configuration with XDG Base Directory support and multi-provider support
-- **Verbose Mode**: Optional detailed view of git status and diff in styled boxes
-- **Zero Setup**: Works out of the box with minimal configuration
-- **Custom Instructions**: Add custom instructions to tailor commit messages to your needs
-- **Model Selection**: List and select from available AI models for each provider
+- **Nine providers**: Groq (default), OpenAI, Anthropic, Google, DeepSeek, OpenRouter, xAI, Mistral, and Cerebras. Switch with one flag.
+- **One prompt path**: a single key-based setup. Export an API key and go.
+- **Fang CLI UX**: styled help and errors, built-in `--version`, shell completions, and manpage generation.
+- **Secure input**: a password-masked prompt when a key is missing.
+- **Review before commit**: inspect the message, edit it, or skip the prompt with `-y`.
+- **Custom instructions**: steer the message with `-c`.
 
 ## Installation
 
-### From Source
+### From source
 
 ```bash
 git clone https://github.com/RazoBeckett/goco.git
 cd goco
 go build -o goco .
-sudo mv goco /usr/local/bin/  # Optional: install globally
+sudo mv goco /usr/local/bin/  # optional
 ```
 
-### Using Go Install
+Go 1.26.7 or newer is required.
+
+### With go install
 
 ```bash
 go install github.com/RazoBeckett/goco@latest
 ```
 
-## Quick Start
+## Quick start
 
-1. **Choose your AI provider and set up your API key**:
+1. Export an API key for your provider. Groq is the default:
 
-   **Google Gemini** (get one from [Google AI Studio](https://aistudio.google.com/apikey)):
    ```bash
-   export GOCO_GEMINI_KEY="your-api-key-here"
+   export GROQ_API_KEY="your-api-key-here"
    ```
 
-   **Groq** (get one from [Groq Console](https://console.groq.com)):
-   ```bash
-   export GOCO_GROQ_KEY="your-api-key-here"
-   ```
+2. Change some files in a git repository. To include only staged changes, use `--staged`:
 
-2. **Navigate to your git repository** and stage your changes:
    ```bash
    cd your-project
    git add .
+   goco generate --staged
    ```
 
-3. **Generate a commit message**:
+3. Generate and commit:
+
    ```bash
-   # Use default provider (Gemini)
    goco generate
-
-   # Use Groq provider
-   goco generate --provider groq
-
-   # With custom instructions
-   goco generate --custom-instructions "focus on the backend changes"
-
-   # With specific model
-   goco generate --provider gemini --model gemini-2.5-flash
    ```
-
-4. **List available models**:
-   ```bash
-   # List models for default provider
-   goco models
-
-   # List models for specific provider
-   goco models --provider groq
-   ```
-
-That's it! GoCo will analyze your changes, generate a Conventional Commit message, and commit it for you.
 
 ## Usage
 
-### Basic Usage
-
 ```bash
-# Generate commit message for staged changes
+# Use the default provider
 goco generate
 
-# Show detailed git status and diff
-goco generate --verbose
+# Pick a provider and model
+goco generate --provider openai --model gpt-4o
+goco generate -p anthropic -m claude-sonnet-4-20250514
 
-# Use short flag for verbose mode
-goco generate -V
-
-# Use Groq provider instead of Gemini
-goco generate --provider groq
-
-# Use specific model
-goco generate --provider groq --model llama-3.3-70b-versatile
-
-# Add custom instructions for the AI
-goco generate --custom-instructions "make the message concise"
-
-# Use staged diff instead of working directory
+# Work on staged changes only
 goco generate --staged
 
-# Chain flags: verbose + staged + skip confirmation
+# Show git status and diff first
+goco generate --verbose
+
+# Add instructions for the model
+goco generate --custom-instructions "focus on the API changes"
+
+# Edit before committing, then confirm
+goco generate --edit
+
+# Skip the confirmation prompt
+goco generate --yes
+
+# Commit on a new branch
+goco generate --branch feature/new-thing
+
+# Chain short flags (verbose, staged, yes)
 goco generate -Vsy
-
-# Create new branch and commit
-goco generate -B feature/new-feature
 ```
 
-### Listing Available Models
+### Flags
 
-```bash
-# List models for default provider
-goco models
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--provider` | `-p` | Provider to use. Defaults to `groq`. |
+| `--model` | `-m` | Model to use. Defaults to the provider's recommended model. |
+| `--api-key` | `-k` | API key. Prefer an environment variable. |
+| `--staged` | `-s` | Use the staged diff instead of the working-tree diff. |
+| `--verbose` | `-V` | Print git status and diff before generating. |
+| `--yes` | `-y` | Skip the confirmation prompt. |
+| `--custom-instructions` | `-c` | Extra instructions for the model. |
+| `--edit` | `-e` | Open the message in `$EDITOR` before committing. |
+| `--branch` | `-B` | Create and switch to a branch before committing. |
 
-# List models for a specific provider
-goco models --provider gemini
-goco models --provider groq
-```
+## Providers
 
-### Interactive Features
+GoCo drives providers through the [GoAI SDK](https://goai.sh). Every provider below needs only an API key.
 
-- **Missing API Key**: GoCo will prompt you securely with a password-masked input
-- **Loading Indicator**: Beautiful animated spinner while generating messages
-- **Styled Output**: Commit messages appear in elegant green-bordered boxes
-- **Git Info**: Verbose mode shows git status and diff in separate styled containers
-- **Confirmation Prompt**: Review the generated commit message before committing (skip with -y flag)
-- **Auto-Commit**: After generating, GoCo automatically stages and commits your changes
+| Provider | `--provider` | Default model | Key environment variable |
+|----------|--------------|---------------|--------------------------|
+| Groq | `groq` | `llama-3.3-70b-versatile` | `GROQ_API_KEY` |
+| OpenAI | `openai` | `gpt-4o` | `OPENAI_API_KEY` |
+| Anthropic | `anthropic` | `claude-sonnet-4-20250514` | `ANTHROPIC_API_KEY` |
+| Google | `google` | `gemini-2.5-flash` | `GOOGLE_GENERATIVE_AI_API_KEY` |
+| DeepSeek | `deepseek` | `deepseek-chat` | `DEEPSEEK_API_KEY` |
+| OpenRouter | `openrouter` | `openai/gpt-4o` | `OPENROUTER_API_KEY` |
+| xAI | `xai` | `grok-3` | `XAI_API_KEY` |
+| Mistral | `mistral` | `mistral-large-latest` | `MISTRAL_API_KEY` |
+| Cerebras | `cerebras` | `llama-3.3-70b` | `CEREBRAS_API_KEY` |
+
+For any provider, GoCo also accepts `GOCO_<PROVIDER>_KEY`. For example, `GOCO_GROQ_KEY` works as a fallback for Groq. This keeps keys out of shell history when you prefer not to use the provider's own variable.
 
 ## Configuration
 
-GoCo uses a TOML configuration file located at `~/.config/goco/config.toml` (following XDG Base Directory specification).
-
-### Default Configuration
+The config file lives at `~/.config/goco/config.toml`, following the XDG Base Directory specification. The file is optional. If it is missing, GoCo uses Groq and the standard environment variables.
 
 ```toml
 # ~/.config/goco/config.toml
-api_key_gemini_env_variable = "GOCO_GEMINI_KEY"
-api_key_groq_env_variable = "GOCO_GROQ_KEY"
-default_provider = "gemini"
-```
 
-Note: The config file follows a [General] TOML table in the application configuration.
-When using a full config file, prefer the following structure under a [General]
-header to avoid ambiguity with top-level keys:
-
-```toml
 [General]
-api_key_gemini_env_variable = "GOCO_GEMINI_KEY"
-api_key_groq_env_variable = "GOCO_GROQ_KEY"
-default_provider = "gemini"
-```
-
-This README snippet documents the configuration format used by config.LoadConfig and
-helps users migrate from older top-level keys to the new [General] table if they
-previously placed these keys at the top level of the file.
-
-### Custom Environment Variables
-
-You can customize which environment variable GoCo looks for for each provider:
-
-```toml
-# Use different environment variable names
-api_key_gemini_env_variable = "MY_CUSTOM_GEMINI_KEY"
-api_key_groq_env_variable = "MY_CUSTOM_GROQ_KEY"
-```
-
-Then set your custom variables:
-```bash
-export MY_CUSTOM_GEMINI_KEY="your-api-key-here"
-export MY_CUSTOM_GROQ_KEY="your-api-key-here"
-```
-
-### Setting Default Provider
-
-You can set a default AI provider in your configuration:
-
-```toml
-# Set Groq as the default provider
 default_provider = "groq"
+
+# Optional per-provider overrides.
+[providers.groq]
+api_key_env_variable = "GROQ_API_KEY"
+model = "llama-3.3-70b-versatile"
 ```
 
-### Environment Variables
+- `default_provider` sets the provider used when `--provider` is absent.
+- `providers.<name>.api_key_env_variable` overrides the environment variable name.
+- `providers.<name>.model` sets a default model for that provider.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `GOCO_GEMINI_KEY` | - | Your Google Gemini API key |
-| `GOCO_GROQ_KEY` | - | Your Groq API key |
-| `XDG_CONFIG_HOME` | `~/.config` | Base directory for config files |
+### Environment variables
 
-## Example Output
+| Variable | Description |
+|----------|-------------|
+| `GROQ_API_KEY` | Groq API key. |
+| `OPENAI_API_KEY` | OpenAI API key. |
+| `ANTHROPIC_API_KEY` | Anthropic API key. |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | Google API key. |
+| `DEEPSEEK_API_KEY` | DeepSeek API key. |
+| `OPENROUTER_API_KEY` | OpenRouter API key. |
+| `XAI_API_KEY` | xAI API key. |
+| `MISTRAL_API_KEY` | Mistral API key. |
+| `CEREBRAS_API_KEY` | Cerebras API key. |
+| `GOCO_<PROVIDER>_KEY` | Fallback for any provider. |
+| `XDG_CONFIG_HOME` | Base directory for the config file. Defaults to `~/.config`. |
 
-### Standard Mode
+## Example output
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ feat(auth): implement OAuth2 authentication with Google     │
+│ feat(auth): add OAuth2 login with Google                    │
 │                                                             │
-│ - Add OAuth2 flow for Google authentication                │
-│ - Integrate user session management                        │
-│ - Add proper error handling for auth failures              │
+│ - Add the OAuth2 flow for Google sign-in                    │
+│ - Store the session after the callback                      │
 └─────────────────────────────────────────────────────────────┘
+
+Proceed with this commit?   Yes   No
 ```
 
-### Verbose Mode
-Shows additional styled boxes with:
-- **Git Status**: Current repository status in a blue-bordered box
-- **Git Diff**: Detailed changes in a yellow-bordered box
-- **Commit Message**: Generated message in a green-bordered box
-
-## Development
-
-### Building
-
-```bash
-go build -o goco .
-```
-
-### Running Tests
-
-```bash
-go test ./...
-```
-
-### Linting & Formatting
-
-```bash
-go vet ./...
-go fmt ./...
-```
-
-### Clean Dependencies
-
-```bash
-go mod tidy
-```
-
-## Tech Stack
-
-- **Language**: Go 1.25+
-- **CLI Framework**: [Fang](https://github.com/charmbracelet/fang) + [Cobra](https://github.com/spf13/cobra)
-- **TUI Components**: [Charm Bracelet](https://charm.sh/)
-  - [Bubble Tea](https://github.com/charmbracelet/bubbletea) - Interactive prompt runtime
-  - [Bubbles](https://github.com/charmbracelet/bubbles) - Prompt and spinner components
-  - [Lipgloss](https://github.com/charmbracelet/lipgloss) - Style definitions
-- **AI Providers**: 
-  - [Google Gemini API](https://ai.google.dev/)
-  - [Groq API](https://console.groq.com/) (Llama models)
-- **Config**: TOML via [BurntSushi/toml](https://github.com/BurntSushi/toml)
+Verbose mode adds two boxes before the message: git status and git diff. The theme is orange.
 
 ## Conventional Commits
 
-GoCo generates commits following the [Conventional Commits](https://www.conventionalcommits.org/) specification:
+GoCo writes messages in the [Conventional Commits](https://www.conventionalcommits.org/) format:
 
 ```
 <type>[optional scope]: <description>
@@ -265,35 +179,29 @@ GoCo generates commits following the [Conventional Commits](https://www.conventi
 [optional footer(s)]
 ```
 
-### Supported Types
-- `feat`: New features
-- `fix`: Bug fixes
-- `docs`: Documentation changes
-- `style`: Code style changes (formatting, etc.)
-- `refactor`: Code refactoring
-- `test`: Adding or modifying tests
-- `chore`: Maintenance tasks
+Supported types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`, `ci`, `build`. Breaking changes use `!` before the colon, for example `feat!: drop the v1 API`.
 
-## Contributing
+The generated subject must be 72 characters or fewer and must match the format. If it does not, GoCo stops and asks you to edit it.
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feat/amazing-feature`
-3. Commit your changes: `git commit -m "feat: add amazing feature"`
-4. Push to the branch: `git push origin feat/amazing-feature`
-5. Open a Pull Request
+## Development
+
+```bash
+go build ./...
+go test ./...
+go vet ./...
+gofmt -l .
+```
+
+The CI workflow runs build, vet, formatting, and tests on every pull request.
+
+## Tech stack
+
+- Go 1.26+
+- [Fang](https://charm.land) and [Cobra](https://github.com/spf13/cobra) for the CLI
+- [Charm v2](https://charm.land/blog/v2/) for the terminal UI (Bubble Tea, Bubbles, Lip Gloss)
+- [GoAI SDK](https://goai.sh) for provider access
+- [BurntSushi/toml](https://github.com/BurntSushi/toml) for config
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- [Conventional Commits](https://www.conventionalcommits.org/) for the commit message standard
-- [Charm Bracelet](https://charm.sh/) for the amazing TUI libraries
-- [Google](https://ai.google.dev/) for the Gemini AI API
-- [Groq](https://console.groq.com/) for the fast Llama models
-- The Go community for excellent tooling and libraries
-
----
-
-Made with <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Microsoft-Teams-Animated-Emojis/master/Emojis/Smilies/Red%20Heart.png" alt="Red Heart" width="20" height="20" /> and Go. Transform your git workflow today!
+MIT. See [LICENSE](LICENSE).
