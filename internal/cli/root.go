@@ -20,21 +20,17 @@ func NewRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "goco",
 		Short:   "Generate Conventional Commit messages with AI",
-		Long:    "GoCo generates Conventional Commit messages from your git changes using Gemini or Groq, with Fang-powered help, errors, completions, and manpages.",
-		Example: "  goco\n  goco generate --provider groq --model llama-3.3-70b-versatile\n  goco generate --staged --verbose --custom-instructions \"focus on API changes\"\n  goco models --provider gemini",
+		Long:    "GoCo generates Conventional Commit messages from your git changes using an AI provider, with Fang-powered help, errors, completions, and manpages.",
+		Example: "  goco\n  goco generate --provider openai --model gpt-4o\n  goco generate --staged --verbose --custom-instructions \"focus on API changes\"",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Help()
 		},
 	}
 
-	cmd.AddGroup(
-		&cobra.Group{ID: "main", Title: "Main Commands"},
-		&cobra.Group{ID: "inspect", Title: "Inspect"},
-	)
+	cmd.AddGroup(&cobra.Group{ID: "main", Title: "Main Commands"})
 
 	cmd.AddCommand(newGenerateCmd(deps))
-	cmd.AddCommand(newModelsCmd(deps))
 
 	return cmd
 }

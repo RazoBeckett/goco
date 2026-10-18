@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/razobeckett/goco/internal/ai"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -33,7 +32,7 @@ func newGenerateCmd(deps dependencies) *cobra.Command {
 		Short:   "Generate and optionally apply a Conventional Commit",
 		GroupID: "main",
 		Args:    cobra.NoArgs,
-		Example: "  goco generate\n  goco generate --provider gemini --model gemini-2.5-flash\n  goco generate --staged --edit",
+		Example: "  goco generate\n  goco generate --provider openai --model gpt-4o\n  goco generate --staged --edit",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runGenerate(cmd, deps, opts)
 		},
@@ -44,7 +43,7 @@ func newGenerateCmd(deps dependencies) *cobra.Command {
 }
 
 func bindGenerateFlags(fs *pflag.FlagSet, opts *generateOptions) {
-	fs.StringVarP(&opts.provider, "provider", "p", "", "AI provider to use (gemini or groq)")
+	fs.StringVarP(&opts.provider, "provider", "p", "", "AI provider to use (defaults to groq)")
 	fs.StringVarP(&opts.apiKey, "api-key", "k", "", "API key for the selected provider")
 	fs.StringVarP(&opts.model, "model", "m", "", "Model to use (defaults to the provider's recommended model)")
 	fs.BoolVarP(&opts.staged, "staged", "s", false, "Use staged changes instead of the working tree diff")
@@ -86,10 +85,19 @@ func confirmCommit() (bool, error) {
 }
 
 func providerDisplayName(provider string) string {
-	switch provider {
-	case ai.ProviderGroq:
-		return "Groq"
-	default:
-		return "Gemini"
+	displayNames := map[string]string{
+		"groq":       "Groq",
+		"openai":     "OpenAI",
+		"anthropic":  "Anthropic",
+		"google":     "Google Gemini",
+		"deepseek":   "DeepSeek",
+		"openrouter": "OpenRouter",
+		"xai":        "xAI",
+		"mistral":    "Mistral",
+		"cerebras":   "Cerebras",
 	}
+	if name, ok := displayNames[provider]; ok {
+		return name
+	}
+	return provider
 }
