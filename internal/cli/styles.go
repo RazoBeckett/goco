@@ -4,7 +4,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 func terminalWidth() int {
